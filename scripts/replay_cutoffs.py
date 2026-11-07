@@ -9,6 +9,7 @@ Past schedules do not show seats, so an alternative may not have been bookable.
 Steps are saved and skipped when rerun. 2025 only.
 Usage: PYTHONPATH=. python scripts/replay_cutoffs.py        final_leads, as first measured (0013)
        MURPHY_MODEL=final_clean PYTHONPATH=. python ...     hindsight hidden (0014), in replay_final_clean/
+       MURPHY_MODEL=final_network PYTHONPATH=. python ...   plus communities and the GCN (0017)
 """
 import os, time
 import duckdb, joblib, numpy as np, pandas as pd
@@ -25,7 +26,7 @@ TAG = os.environ.get("MURPHY_MODEL", "final_leads")
 HIDDEN = TAG != "final_leads"  # the original model saw the aircraft inputs unhidden
 R = OUT / ("replay" if not HIDDEN else f"replay_{TAG}")
 MODEL = OUT / f"{TAG}.joblib"
-FEATS = OUT / "clean" / "full" if HIDDEN else ft.OUT
+FEATS = OUT_DIR / "network" / "full" if TAG == "final_network" else OUT / "clean" / "full" if HIDDEN else ft.OUT
 ROWS = OUT_DIR / "rows.parquet"
 F2025 = str(ROOT / "data" / "flights" / "2025_*.parquet")
 BUFFERS = (30, 60, 120)
@@ -90,6 +91,9 @@ def build_alternatives(cur: pd.DataFrame) -> None:
         print(f"alternative inputs: {time.time() - t0:.0f} s", flush=True)
     if HIDDEN and not (feats / "d_raw.parquet").exists():
         hide_alternatives(rows, feats)
+    if TAG == "final_network" and not (feats / "m.parquet").exists():  # layer 4's regional inputs (0017)
+        from scripts.network import alt_inputs
+        alt_inputs(rows, feats)
     path = R / "alt_forecasts.parquet"
     if not path.exists():
         t0 = time.time()
