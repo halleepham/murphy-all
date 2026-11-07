@@ -16,6 +16,7 @@ from murphy.forecast.score import PCOLS
 from murphy.recommend import FIRM_FROM, MAX_EARLIER_H, UNSURE_FROM, p_make, verdict
 
 DB = ROOT / "data" / "forecast" / "app" / "replay.duckdb"
+MODEL = "final_network"  # 0017; scripts/build_app_data.py reads its replay
 LEADS = {24, 6, 2}
 DEADLINES = {30, 60, 120}
 STATIC = Path(__file__).parent / "static"
@@ -61,8 +62,8 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
             "flight": {"flight": f"{t.carrier} {t.flight_number}", "flight_id": t.flight_id, "date": str(t.flight_date)[:10],
                        "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local},
             "alternatives": alts,
-            "provenance": {"model": "final_clean", "forecast_as_of_utc": str(t.as_of_utc), "lead_h": int(t.lead_h),
-                           "data": "BTS On-Time Performance 2025; IEM weather", "decisions": ["0014", "0015", "0016"]},
+            "provenance": {"model": MODEL, "forecast_as_of_utc": str(t.as_of_utc), "lead_h": int(t.lead_h),
+                           "data": "BTS On-Time Performance 2025; IEM weather", "decisions": ["0014", "0015", "0016", "0017"]},
             "uncertainty": {"track_record": {"band": band, "forecasts": int(track.forecasts),
                                              "predicted_miss": float(track.predicted_miss), "true_miss": float(track.true_miss)},
                             "limits": LIMITS}}

@@ -1,15 +1,16 @@
 """Precompute what the first screen reads, from the 2025 replay (docs/decisions/0016). 2025 only.
 
 Writes data/forecast/app/replay.duckdb: trips and their alternatives without outcomes, and the track
-record, which is the one place outcomes are used. Uses hidden inputs (final_clean, 0014).
+record, which is the one place outcomes are used. Uses the app's model (MODEL in murphy/app/server.py).
 Usage: PYTHONPATH=. python scripts/build_app_data.py
 """
 import duckdb, numpy as np, pandas as pd
+from murphy.app.server import MODEL
 from murphy.forecast.sample import ROOT
 from murphy.forecast.score import PCOLS
 from murphy.recommend import FIRM_FROM, UNSURE_FROM, made_it, p_make
 
-R = ROOT / "data" / "forecast" / "alternatives" / "replay_final_clean"
+R = ROOT / "data" / "forecast" / "alternatives" / f"replay_{MODEL}"
 F2025 = ROOT / "data" / "flights" / "2025_*.parquet"
 OUT = ROOT / "data" / "forecast" / "app" / "replay.duckdb"
 FARES = ROOT / "data" / "forecast" / "fares.parquet"

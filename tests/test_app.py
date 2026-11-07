@@ -2,7 +2,7 @@ import duckdb
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
-from murphy.app.server import create_app
+from murphy.app.server import MODEL, create_app
 from murphy.forecast.score import PCOLS
 
 
@@ -50,7 +50,7 @@ def test_high_risk_changes_marks_best_and_traces_the_cost(client):
     assert d["answer"]["verdict"] == "consider_changing"
     assert [(a["flight_id"], a["best"]) for a in d["alternatives"]] == [("a1", True), ("a2", False), ("a3", False)]
     assert d["alternatives"][0]["cost"]["fare"] == 300.0 and "DB1B" in d["alternatives"][0]["cost"]["source"]
-    assert d["provenance"]["model"] == "final_clean" and d["uncertainty"]["limits"]
+    assert d["provenance"]["model"] == MODEL == "final_network" and d["uncertainty"]["limits"]
 
 
 def test_too_uncertain_still_lists_alternatives(client):

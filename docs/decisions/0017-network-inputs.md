@@ -208,7 +208,11 @@ model also acts a little more, and a few more travelers end up worse off.
 **Conclusion:** network inputs make the forecast slightly better calibrated and leave the
 recommendations about the same. Communities are worth more as explanation ("your region is having
 a bad hour") than as accuracy. The GCN's edges help the forecast but not the GCN's own target, so
-how they help is not shown. The app still reads `replay_final_clean`; switching it is a separate step.
+how they help is not shown. **Owner decided, 7 Nov 2026: switch the app to `final_network`.** `MODEL` in `murphy/app/server.py`
+names it, and `scripts/build_app_data.py` builds from that model's replay. Rebuilt: 2,070,453 trips,
+776,125 alternatives for 175,985 trips (was 726,628 for 165,493), because the new model flags more
+trips. Track record at 60 min: kept 7.8% predicted vs 8.5% true miss; uncertain 48.0% vs 53.3%;
+high 74.5% vs 82.0%.
 
 ## AI-recommendation instances
 
