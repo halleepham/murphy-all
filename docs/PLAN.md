@@ -104,7 +104,7 @@ forecast. Calibrated within 0.034 in every bin for "late", running low (`0010` F
 *Measured so far (`0011`):* alternatives per trip and input build cost. The model was
 refit with lead times across 1–24 h (`final_leads`), because the first model's risk
 estimates shifted with lead time. Alternatives are capped at 24 h. Precomputing for the
-app waits until its features are decided. Nothing below is built yet.
+app waits until its features are decided.
 
 In code, not the LLM: chance of making the deadline, then keep, consider changing, or
 too uncertain to say. Change only if the current flight's chance of missing is high
@@ -119,7 +119,7 @@ route and airline in DB1B 2025 Q2, labeled as an estimate. No premium, because n
 one. A last-minute seat may cost more, and the app says so. A past schedule shows that a flight
 existed, not that it had a seat.
 
-**App:** not Streamlit (`0003`). One screen first; layer 7 finishes it.
+**App:** not Streamlit (`0003`). *Built (`0016`):* the verdict and one plain screen over the 2025 replay. Layer 7 finishes it.
 
 ### 4. Network inputs, tested with and without.
 

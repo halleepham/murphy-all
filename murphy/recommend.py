@@ -17,6 +17,9 @@ MAX_CLASSES = CLASSES.index("165-180") + 1  # early through 165-180
 MIN_MISS = 0.50
 MIN_GAIN = 0.15
 MAX_EARLIER_H = 2  # default; the traveler can change it
+# The app's bands (0014 Decision 4). MIN_MISS above stays as the replay's setting.
+UNSURE_FROM = 0.40
+FIRM_FROM = 0.60
 
 
 def p_make(p: np.ndarray, slack_min) -> np.ndarray:
@@ -47,3 +50,18 @@ def inbound_too_late(delay_so_far, turn_min, slack_min) -> np.ndarray:
     """The traveler's rule of thumb: the inbound aircraft's lateness outlasts its scheduled
     turn by more than the deadline allows. A blank delay or turn says nothing, so never fires."""
     return (np.asarray(delay_so_far, dtype=float) - np.asarray(turn_min, dtype=float)) > slack_min
+
+
+def verdict(p_make_current: float, p_make_best_alt: float | None, known_cancelled: bool = False) -> str:
+    """One trip's advice. A flight known to be cancelled is stated as that, not as a risk (0013
+    Decision 2). A high risk with no flight that clears the gain is not advice to change."""
+    if known_cancelled:
+        return "cancelled"
+    miss = 1 - p_make_current
+    if miss < UNSURE_FROM:
+        return "keep"
+    if miss < FIRM_FROM:
+        return "too_uncertain"
+    if p_make_best_alt is not None and p_make_best_alt - p_make_current >= MIN_GAIN:
+        return "consider_changing"
+    return "at_risk_no_better_flight"
