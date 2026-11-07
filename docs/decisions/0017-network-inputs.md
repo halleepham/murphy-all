@@ -2,7 +2,9 @@
 
 Date: 7 Nov 2026. 2023–25 only; no 2026 outcome was read. One early count of rows and
 airports did include the 2026 files. Scripts for the numbers below move into the repo with
-this work. **Decisions are made; nothing under them is built yet unless a result says so.**
+this work. **Built and measured** (Findings 1–4 below). Code: `murphy/forecast/network.py`,
+`murphy/forecast/gcn.py`, `scripts/network.py`, tests in `tests/test_network.py`. Results are in
+`data/forecast/network/` (gitignored), logs in `data/forecast/logs/network_*.log`.
 
 ## Quick check before deciding
 
@@ -115,6 +117,99 @@ hours, under 1 GB, 1,505 parameters, no GPU.
 
 A small Brier gain alone does not change the model.
 
+## Finding 1 — The communities
+
+From 2023–24: 5 groups, modularity 0.5532, best of 30 Louvain seeds over the summed yearly graphs.
+341 airports had departures in 2023–24. The 100 big ones are grouped directly; smaller airports join
+the group they fly to most. 336 airports get a group; GST, PSG, SPN, WRG and YAK get none.
+Groups: `network/communities.csv`.
+
+**Inputs made from them** (group f): flights and late share at the origin's and destination's
+group in the 2 hours before the forecast, leaving out the airport itself. Group n is the same
+for the whole country, the simpler baseline. 2026 rows are blank.
+
+## Finding 2 — The GCN
+
+Squared error on each big airport's late share over the next 3 hours, 2025, weighted by flights.
+2023 is predicted by a model trained on 2024 and the reverse; 2025 from both. True 2025 late share
+0.230. From `network/gcn_compare.csv` and `network/gcn_seeds.csv`:
+
+| Model | Error, seed 0 | Seeds 1, 2 |
+|---|---|---|
+| Usual for the hour | 0.02730 | |
+| Last 2 h at this airport | 0.02440 | |
+| GCN, no edges | 0.01192 | 0.01183, 0.01188 |
+| GCN, co-disruption edges | 0.01214 | 0.01195, 0.01183 |
+| GCN, routes | 0.01306 | |
+| GCN, routes, 8 busiest per airport | 0.01247 | |
+
+**Read:** the GCN halves the error of the simple baselines, but message passing adds nothing on
+its own target: co-disruption edges tie with no edges (seed 0 difference +0.00022, interval −0.00008
+to +0.00048), and route edges are worse. Trimming routes to the 8 busiest helped but stayed worse.
+Seed 0 co-disruption runs high (mean 0.246 predicted against 0.230).
+
+## Finding 3 — Leak checks, all passed
+
+- At every top-of-hour forecast (207,436 rows), the GCN's input window matches the forecast's own
+  2-hour window, and wiping everything after the forecast time changes nothing.
+- On 300,000 sampled rows of each set, the own-airport window equals the existing current-state
+  input (group C) exactly.
+- Hidden-flight probe (`0014`): AUC 0.7682 with nothing, 0.7696 with hidden inputs, 0.7702 with the
+  new inputs. A leak would push this far up.
+- A deliberate peek control's top tenth reaches 0.0549 on the leak screen; the new inputs reach
+  0.032–0.036. The GCN's top tenth is 51% late, against 71% for the forecast's own top tenth.
+
+## Finding 4 — Quick fits, refit and replay
+
+**Quick fits** (225 rounds on the fit rows, multiclass Brier on 2025, change from base, 95%
+interval by day; `network/quick_compare.csv`):
+
+| Inputs | Change | Interval |
+|---|---|---|
+| n, whole country | −0.00022 | −0.00031 to −0.00012 |
+| f, communities | −0.00041 | −0.00050 to −0.00031 |
+| GCN no edges, seed 0 (h) | −0.00061 | −0.00071 to −0.00049 |
+| GCN co-disruption, seed 0 (g) | −0.00096 | −0.00121 to −0.00073 |
+| GCN no edges, seed 1 (k) | −0.00055 | −0.00069 to −0.00041 |
+| GCN co-disruption, seed 1 (i) | −0.00089 | −0.00114 to −0.00067 |
+| f + GCN co-disruption, 3-seed average (fm) | −0.00103 | −0.00127 to −0.00082 |
+
+Communities beat the whole country (f − n −0.00019, −0.00027 to −0.00011). Co-disruption edges beat
+no edges as a forecast input on both seeds (g − h −0.00035; i − k −0.00034, −0.00050 to −0.00019),
+though they tie on the GCN's own target. Seed 0 alone with f did slightly better than the average
+(fm − fg +0.00011), but **fm was chosen** so as not to pick a seed on 2025. The intervals are
+entirely below zero, so one full refit was run.
+
+**Full refit** `final_network`: groups abcdefm, 84 inputs, 300 rounds, fit 2,504 s. On all
+2,070,453 forecasts of 2025 (`network/final_compare.csv`):
+
+| Lead | Multiclass Brier change | Interval | Late Brier change | Interval |
+|---|---|---|---|---|
+| All | −0.00093 | −0.00113 to −0.00077 | −0.00058 | −0.00074 to −0.00046 |
+| 2 h | −0.00096 | −0.00114 to −0.00080 | −0.00050 | −0.00061 to −0.00040 |
+| 6 h | −0.00102 | −0.00126 to −0.00080 | −0.00072 | −0.00090 to −0.00054 |
+| 24 h | −0.00082 | −0.00108 to −0.00059 | −0.00053 | −0.00075 to −0.00035 |
+
+Predicted late share rises from 0.2224 to 0.2249, against a true 0.2361: still low, less so.
+
+**Replay** (the chosen rule, all trips, net per 1,000; `replay_final_*/baselines.csv`):
+
+| Deadline | `final_clean` | `final_network` | Changes | Worse off |
+|---|---|---|---|---|
+| 30 min | 4.62 (4.23 to 4.97) | 4.74 (4.34 to 5.11) | 21,249 → 21,897 | 663 → 716 |
+| **60 min** | **1.63 (1.48 to 1.75)** | **1.64 (1.49 to 1.78)** | 7,466 → 7,600 | 248 → 275 |
+| 120 min | 0.42 (0.38 to 0.48) | 0.44 (0.39 to 0.50) | 2,388 → 2,443 | 132 → 136 |
+
+The 3.84 named earlier was `final_leads` (`0014`), not `final_clean`; 1.63 is the right comparison.
+Net is not worse at any deadline, so **by Decision 5 the inputs are kept.** The gain in net is
+within noise: the intervals overlap almost entirely, and a paired interval was not computed. The
+model also acts a little more, and a few more travelers end up worse off.
+
+**Conclusion:** network inputs make the forecast slightly better calibrated and leave the
+recommendations about the same. Communities are worth more as explanation ("your region is having
+a bad hour") than as accuracy. The GCN's edges help the forecast but not the GCN's own target, so
+how they help is not shown. The app still reads `replay_final_clean`; switching it is a separate step.
+
 ## AI-recommendation instances
 
 | AI recommended | Owner | Why |
@@ -124,3 +219,4 @@ A small Brier gain alone does not change the model.
 | Drop the shared-disruption rule | accepted | Same-route alternatives always share it |
 | Two-layer GCN, routes then co-disruption, no aircraft edges | accepted | Simplest with weights; measured as cheap |
 | Quick fit, refit, replay as the test | accepted | Keeps a tiny Brier gain from changing the model |
+| Average 3 GCN seeds, not the best one | accepted (rule agreed in advance) | Avoids picking a seed on 2025 |

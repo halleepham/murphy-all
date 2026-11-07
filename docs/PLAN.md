@@ -60,7 +60,7 @@ flight, so they are stated limitations, not per-flight signals.
 |---|---|---|
 | Is the forecast good? | Climatology | Measured on 2025 (`0010` Finding 2) |
 | Which inputs help? | Schedule; then history; current state and aircraft; weather | Measured on 2025 (`0010` Finding 2) |
-| Does network information help? | With and without communities; with and without GNN | Not built |
+| Does network information help? | With and without communities; with and without GNN | Measured on 2025 (`0017` Finding 4): small Brier gain, net about the same |
 | Are recommendations good? | No change at all; a traveler's rule of thumb (`0014`). Climatology and the schedule-only model almost never act | Measured on 2025 with `final_clean` (`0014` Finding 3) |
 | Do trust checks help? | The recommender with and without them | Not built |
 | Is retrieval good? | Vector vs BM25 | Not built |
@@ -133,6 +133,9 @@ existed, not that it had a seat.
 
 Only information known at the forecast time counts. If either helps, retrain once and
 rerun the scoring.
+
+*Built (`0017`):* five co-disruption communities and a two-layer GCN, both as inputs.
+Refit as `final_network`; Brier slightly better, net per 1,000 about the same, so kept.
 
 ### 5. Knowledge graph and evidence.
 
