@@ -1,4 +1,4 @@
-# murphy
+# Murphy
 
 Course project for **CS 5542 — Big Data Analytics & Applications**, Fall 2026.
 Solo project by Hallee Pham.

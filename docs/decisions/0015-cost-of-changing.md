@@ -6,7 +6,7 @@ Code: `scripts/build_fares.py`, `murphy/cost.py`, `scripts/replay_change_kinds.p
 
 ## Human design
 
-The owner accepted route fares plus a tested range for the last-minute premium, to show how murphy weighs cost
+The owner accepted route fares plus a tested range for the last-minute premium, to show how Murphy weighs cost
 (`0010` Decision 5). It is not an accurate picture of fares, and no result is reported as real dollars saved.
 The owner also accepted an "advice flips" check once a cost estimate exists (`0014` Decision 1).
 

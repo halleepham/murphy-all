@@ -175,3 +175,4 @@ table.ev td.traced { text-decoration: underline dotted; cursor: help; }
 details.fold { margin-top: 8px; }
 details.fold > summary { font-size: .82rem; }
 details.fold > p, details.fold > ul { margin: 6px 0 0 14px; }
+table.days td.wrap { white-space: normal; min-width: 22em; }

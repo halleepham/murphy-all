@@ -271,7 +271,7 @@ def test_the_default_situation_follows_the_advice(client):
 
 
 def test_the_three_pages_and_shared_files_are_served(client):  # 0023
-    for path, marker in [("/", 'id="find"'), ("/trip", 'id="assistant"'), ("/about", "About murphy")]:
+    for path, marker in [("/", 'id="find"'), ("/trip", 'id="assistant"'), ("/about", "About Murphy")]:
         r = client.get(path)
         assert r.status_code == 200 and marker in r.text and 'class="topbar"' in r.text
     assert "--accent" in client.get("/static/app.css").text

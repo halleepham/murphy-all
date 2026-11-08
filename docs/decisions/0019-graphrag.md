@@ -93,7 +93,7 @@ Read by AI:
   WN1383's best alternative by time ("1010 am"), not by flight number. The one number: "15 000 ft",
   decoded from a METAR.
 - **BM25** has no time or lead filter. On DL1725 at 2 h it offered alternatives from the 6 h
-  forecast and said "a better flight exists"; at 2 h murphy offers none. For AA3104 it did not
+  forecast and said "a better flight exists"; at 2 h Murphy offers none. For AA3104 it did not
   retrieve the trip's own forecast, nor any weather for "why". 12 of 16 evidence sets held outcomes
   learned after the flight; no answer was seen to use them.
 - **No retrieval** never invented a number in run 2 and answered nothing. In run 1 it invented

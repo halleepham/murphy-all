@@ -15,12 +15,12 @@ Stated by the owner on 5 Nov. No earlier record had it. The closest was `0002`:
 without testing it, since it had no way to distrust a single forecast, no action
 tied to that, and no test based on decisions.
 
-## Decision 2 — Users and what makes murphy different
+## Decision 2 — Users and what makes Murphy different
 
 **Owner's words, summarized.** Users are travelers with a deadline or time
 constraint: a tight connection, a wedding, a meeting. A user enters a flight and
 sees the risk. Other tools give a number that does not relate to a person's
-itinerary and time constraints; murphy does. Trusting the score is a mix of
+itinerary and time constraints; Murphy does. Trusting the score is a mix of
 having evidence and not giving just a single number about delay.
 
 ## Decision 3 — Replan, do not restart

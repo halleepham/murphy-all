@@ -1,4 +1,4 @@
-# murphy — agent instructions
+# Murphy — agent instructions
 
 CS 5542 Big Data Analytics & Applications. Solo project, Hallee Pham.
 Rebuilt from zero on 1 Nov 2026. The previous repository is archived at

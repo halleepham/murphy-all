@@ -40,7 +40,7 @@ chosen by forecast alone.
 | Consider changing | 4,489 | 24.0% |
 | High risk, no clearly better flight | 14,223 | 76.0% |
 
-The 4,489 matches `0014` Decision 4 exactly. **Read:** on about three of four high-risk forecasts murphy warns but has nothing clearly better to offer. Each took 18 ms, reading the data file directly.
+The 4,489 matches `0014` Decision 4 exactly. **Read:** on about three of four high-risk forecasts Murphy warns but has nothing clearly better to offer. Each took 18 ms, reading the data file directly.
 
 **Track record shown** (all of 2025, all lead times):
 

@@ -16,7 +16,7 @@ risk by a large margin. Show the estimated cost of a new ticket so the traveler 
 it, and support each recommendation with traceable evidence. Measure prediction and recommendation quality
 against simpler baselines.
 
-## What murphy is
+## What Murphy is
 
 **Users:** travelers with a deadline or time constraint, such as a tight
 connection, a wedding, or a meeting.
@@ -30,7 +30,7 @@ whether to keep the flight or consider changing. **The traveler always decides.*
    flight. Murphy answers "will I make *my* connection or *my* deadline?"
 2. **It recommends a change only when it is really needed.** Arriving sooner is
    never a reason. If the current flight still arrives on time, keep it. Changing
-   costs money, and murphy says so.
+   costs money, and Murphy says so.
 3. **Its reasons can be checked.** It shows the evidence, how that kind of forecast
    has done before, and whether the advice holds up.
 

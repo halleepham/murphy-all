@@ -16,7 +16,7 @@ previous project's graph and can be cleared.
 
 - **Summary layer:** airports, carriers, the five `0017` communities, route links and the
   co-disruption links the GCN was trained on (2023–24).
-- **Replay slice:** the replay's forecasted flights, the alternatives murphy offered for them
+- **Replay slice:** the replay's forecasted flights, the alternatives Murphy offered for them
   (`0011`), and the METAR and TAF weather reports at the 30 airports that have them.
 - **Aircraft (tail numbers) are left out.** BTS records the aircraft that flew, which is
   known only afterwards (`0014`). A graph that explained a risk through it would use

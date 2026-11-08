@@ -136,7 +136,7 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
     past_index, taf_as_of: the similar-past-days index and TAF lookup (fakes in tests).
     policy_ix: the policy-passage index (a fake in tests).
     map_inputs: a function returning the map's files, or None if not built (a fake in tests)."""
-    app = FastAPI(title="murphy")
+    app = FastAPI(title="Murphy")
     con = duckdb.connect(str(db), read_only=True)
     graph_session = graph_session or neo4j_sessions()
     past_index = past_index or pastdays_index()

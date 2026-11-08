@@ -168,7 +168,7 @@ async function map(box) {
       }
       c.append(fold("Technical details", ...(w.metar ? [`Observation (METAR), known ${w.metar.known_at} UTC: ${w.metar.text}`, `In full: ${w.metar.plain.text}`] : []),
         ...(w.taf ? [`Forecast (TAF), issued ${w.taf.issued_utc} UTC: ${w.taf.lines.join(" · ")}`] : []),
-        `"Expected around then" covers forecast windows within an hour of your flight and uses murphy's simple thresholds, not an aviation rule: ${w.thresholds}.`, w.source));
+        `"Expected around then" covers forecast windows within an hour of your flight and uses Murphy's simple thresholds, not an aviation rule: ${w.thresholds}.`, w.source));
       cols.append(c);
     });
     wxBox.replaceChildren(el("h3", "Weather"), cols);
@@ -178,7 +178,7 @@ async function map(box) {
   renderWeather();
   const lim = [...d.uncertainty.limits]; if (offMap) lim.push(`Airports outside the map's projection, not drawn: ${offMap}.`);
   const p = d.provenance;
-  notes.replaceChildren(fold("How to read this map", "The line is your route, colored by murphy's advice. Dots are airports. Use the switches to show or hide each layer, and the slider to see the day leading up to your forecast.", ...lim),
+  notes.replaceChildren(fold("How to read this map", "The line is your route, colored by Murphy's advice. Dots are airports. Use the switches to show or hide each layer, and the slider to see the day leading up to your forecast.", ...lim),
     fold("Technical details", `GCN: ${p.gcn}. Areas: ${p.regions}. Links: ${p.links}.`,
       `Forecast as of ${p.forecast_as_of_utc} UTC; the slider's last hour is ${p.forecast_hour_utc} UTC. Decision record ${p.decisions.join(", ")}.`));
   if (mapView.zoom) svg.call(zoom.transform, mapView.zoom); else draw();

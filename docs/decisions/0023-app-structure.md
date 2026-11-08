@@ -8,7 +8,7 @@ Date: 8 Nov 2026. **Built** (Decision 2). Code: `murphy/app/static/` (`index.htm
 
 The owner wants it to feel like a real application, not a long single page:
 
-- a top bar saying "murphy" on every page (logo later);
+- a top bar saying "Murphy" on every page (logo later);
 - a landing page: headline and short description on the left with an About button, the flight
   form on the right with examples that prefill it; no accounts or logins;
 - an About page about the project;
@@ -54,7 +54,7 @@ lead-time view, the map) each land in a known place instead of piling onto one p
    line of `LIMITS` in `server.py`. The forecast's own provenance (model, as-of time, flight
    record) is specific to the trip, so it stays on the results page as a "Where this forecast
    came from" link in the top card (AI choice, to keep Evidence + Provenance on every output).
-7. **About page outline:** what murphy does, why it is named murphy (the owner writes this), how
+7. **About page outline:** what Murphy does, why it is named Murphy (the owner writes this), how
    it works (the poster's diagrams later), data sources, limitations. A high-level version of the
    poster.
 8. **Visualizations are still to come** in the tabs and the top card.
@@ -72,13 +72,13 @@ lead-time view, the map) each land in a known place instead of piling onto one p
 - Owner's feedback on the results page.
 - Before the chart: whether the forecast supports any deadline, or only 30, 60 and 120 minutes.
 
-## Change, 8 Nov 2026: Ask murphy floats
+## Change, 8 Nov 2026: Ask Murphy floats
 
 **Owner:** the side panel should not have its own scroll and should give the main column more room;
 asked whether it could fold sideways, or open from a floating button in the corner.
 **AI:** all three are possible (fold sideways, floating button, or both by screen width); recommended
 the floating button. **Owner chose the floating button.** The results page now uses the full width;
-a round button at the bottom right opens Ask murphy as a card over the page (× or Esc closes it).
+a round button at the bottom right opens Ask Murphy as a card over the page (× or Esc closes it).
 Only the card's messages scroll, since an overlay cannot grow past the screen. Checked in headless
 Chrome at 1400 and 500 px wide.
 

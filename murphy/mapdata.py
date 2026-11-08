@@ -41,7 +41,7 @@ def weather_at(airport: str, as_of, around=None) -> dict:
     from murphy.datalayer.weather import AIRPORTS as WX
     if airport not in WX:
         return {"airport": airport, "limited": True,
-                "reason": f"murphy has weather reports for 30 large airports, and {airport} is not one of them."}
+                "reason": f"Murphy has weather reports for 30 large airports, and {airport} is not one of them."}
     t = pd.Timestamp(as_of).tz_localize("UTC").to_pydatetime()
     obs, taf = asof.asos_as_of(t, airport, lookback_hours=3), asof.taf_as_of(t, airport)
     tz = pd.read_parquet(AIRPORTS, columns=["airport", "tz"]).set_index("airport").tz.get(airport)
@@ -119,7 +119,7 @@ def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame
                 f"Airports left off the map for lack of coordinates: {len(places) - len(have)}.",
                 "Weather reports cover 30 large airports."],
                 # 0022 Finding 1, in plain words: hit share 0.450 (GCN) vs 0.299 (link weight) vs 0.294 (random)
-                "why_these": "murphy picks them with a model of how delays spread between airports. In tests on "
+                "why_these": "Murphy picks them with a model of how delays spread between airports. In tests on "
                              "2025, 45% of its picks turned out to be among the 3 worst-hit linked airports over the "
                              "next 3 hours. Picking the airports with the thickest lines got 30%, about the same as "
                              "picking at random (29%).",

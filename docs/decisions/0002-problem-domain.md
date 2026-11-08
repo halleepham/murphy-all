@@ -6,7 +6,7 @@
 ## Decision 1 — The concept carries over from the original idea
 
 The owner's concept, in their words where possible. This is the general idea
-behind murphy and is kept. The *implementation* is rebuilt from scratch, and
+behind Murphy and is kept. The *implementation* is rebuilt from scratch, and
 murphy-v1's methods are still not a reference.
 
 > An application that predicts a traveler's flight and whether there is any

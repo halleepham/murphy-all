@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>murphy · your flight</title>
+<title>Murphy · your flight</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header class="topbar"><div class="inner">
-  <a class="brand" href="/">murphy</a>
+  <a class="brand" href="/">Murphy</a>
   <nav><a href="/">New search</a><a href="/about">About</a></nav>
 </div></header>
 
@@ -38,14 +38,14 @@
   <section class="panel" id="panel"></section>
  </div>
 
- <aside class="assistant card" id="assistant" hidden aria-label="Ask murphy">
-  <div class="assistant-head"><h2>Ask murphy</h2><button type="button" class="close" id="ask-close" aria-label="Close">×</button></div>
-  <p class="muted small">Answers use only murphy's data about this trip. If an answer states a number that isn't in that data, it's flagged.</p>
+ <aside class="assistant card" id="assistant" hidden aria-label="Ask Murphy">
+  <div class="assistant-head"><h2>Ask Murphy</h2><button type="button" class="close" id="ask-close" aria-label="Close">×</button></div>
+  <p class="muted small">Answers use only Murphy's data about this trip. If an answer states a number that isn't in that data, it's flagged.</p>
   <div id="chat" class="chat"></div>
   <div id="asks" class="examples"></div>
  </aside>
 </main>
-<button type="button" class="fab" id="ask-open" aria-label="Ask murphy" aria-expanded="false" aria-controls="assistant">
+<button type="button" class="fab" id="ask-open" aria-label="Ask Murphy" aria-expanded="false" aria-controls="assistant">
   <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
 </button>
 
@@ -94,7 +94,7 @@ function renderHead() {
   const change = el("a", "Check another flight", "change small"); change.href = "/"; $("head").append(change);
   $("chance").textContent = pct(a.chance);
   $("verdict").textContent = WORDS[a.verdict]; $("verdict").className = "verdict " + a.verdict;
-  $("track").textContent = `Past accuracy: for flights like this, murphy expected ${pct(t.predicted_miss)} to miss; ${pct(t.true_miss)} did.`;
+  $("track").textContent = `Past accuracy: for flights like this, Murphy expected ${pct(t.predicted_miss)} to miss; ${pct(t.true_miss)} did.`;
   $("summary").hidden = false;
   const p = trip.provenance;
   $("where-text").textContent = `Model ${p.model}, forecast as of ${p.forecast_as_of_utc} UTC (${p.lead_h} h before departure). ${p.data}. Flight record ${f.flight_id}. Past accuracy from ${t.forecasts.toLocaleString("en-US")} forecasts in the same risk band, 2025. Decision records: ${p.decisions.join(", ")}. Limits are on the About page.`;
@@ -166,7 +166,7 @@ function renderChart() {
     });
   }
   const i = c.deadline_min.indexOf(deadline), alt = c.best_alt ? `, the best alternative ${pct(c.best_alt.chance[i])}` : "";
-  $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight forecast at the same time before departure ${pct(c.typical[i])}. murphy hasn't tested its advice for deadlines more than ${c.checked_to} minutes after arrival, so the deadline stops there.`;
+  $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight forecast at the same time before departure ${pct(c.typical[i])}. Murphy hasn't tested its advice for deadlines more than ${c.checked_to} minutes after arrival, so the deadline stops there.`;
   $("whatif").hidden = false;
 }
 
@@ -226,10 +226,19 @@ async function pastdays(box) {
     out.push(el("p", "This counts every departure from the airport that day, not your flight.", "muted small"));
   } else out.push(el("p", `${u.reason} Not enough evidence, so no percent is shown.`, "muted"));
   if (d.query) {
-    const ul = el("ul", null, "evidence");
-    d.days.forEach(x => ul.append(el("li", `${x.date}: ${pct(x.late_share)} late or cancelled (${x.n_late} of ${x.n_dep} departures). ${x.text}`)));
-    out.push(fold(`See the ${d.days.length} days`, `Today's forecast: ${d.query.text}`, ul));
-    out.push(fold("How to read this", "murphy looks for earlier days when the airport's weather forecast read most like today's, then counts how those days went. It describes the airport, not your flight."));
+    // The day's sentence opens with "ATL, a Friday in January."; the date column already says that.
+    const weather = text => text.replace(/^[A-Z]{3}, an? \w+ in \w+\.\s*/, "");
+    const wrap = el("div", null, "scroll"), t = el("table", null, "days"), hr = el("tr");
+    ["Date", "Late or cancelled", "Departures", "Weather forecast that day"].forEach(h => hr.append(el("th", h)));
+    t.append(hr);
+    d.days.forEach(x => {
+      const tr = el("tr");
+      tr.append(el("td", x.date), el("td", pct(x.late_share)), el("td", `${x.n_late} of ${x.n_dep}`), el("td", weather(x.text), "wrap"));
+      t.append(tr);
+    });
+    wrap.append(t);
+    out.push(fold(`See the ${d.days.length} days`, `Today's forecast: ${weather(d.query.text)} Most similar days first.`, wrap));
+    out.push(fold("How to read this", "Murphy looks for earlier days when the airport's weather forecast read most like today's, then counts how those days went. It describes the airport, not your flight."));
     out.push(fold("Technical details", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}.`,
       `Similarity of each day: ${d.days.map(x => `${x.date} ${x.similarity.toFixed(3)}`).join(", ")}. Mean ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
   }

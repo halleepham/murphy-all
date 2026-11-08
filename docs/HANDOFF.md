@@ -1,4 +1,4 @@
-# Handoff — murphy, rebuilt from zero
+# Handoff — Murphy, rebuilt from zero
 
 Written 1 Nov 2026 at the end of the session that created this repository.
 Read this before doing anything else. `AGENTS.md` holds the rules; this holds

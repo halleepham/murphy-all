@@ -158,7 +158,7 @@ open are not decided. None of this is built.
    best choice and the risk of not making it is high.
 3. Arriving sooner is never a reason to change. If the current flight still arrives
    on time, stay on it, even if alternatives arrive earlier.
-4. The cost of changing matters a lot to some people, so murphy is transparent about it.
+4. The cost of changing matters a lot to some people, so Murphy is transparent about it.
 5. The end product is an application. Backend work must support it, and the owner
    needs to present the methods in the demo and poster.
 6. The recommendation should be planned to evolve as the required methods are added.
@@ -202,7 +202,7 @@ without it on 2024–25, and be frozen, before it counts as tested on 2026.
   picks from the results.
 - Test 2 asks: did we correctly predict that the current flight would not work out,
   and was the recommended alternative good? Those are the main measures. "No tool"
-  is only a reference point, not what murphy competes with.
+  is only a reference point, not what Murphy competes with.
 - Murphy can list several alternatives while marking what it thinks the user should
   do and the best one.
 - Murphy is a proof of concept. Estimated costs are acceptable, based on data where
@@ -229,7 +229,7 @@ recommendation holds up.
   The claim's wording is to be simplified.
 - **Cost: accepted**, DB1B fares plus a tested range for the last-minute premium. The
   point is not an accurate picture of real fares, because that data is not available.
-  It is to show how murphy takes cost into account and helps the user decide. So no
+  It is to show how Murphy takes cost into account and helps the user decide. So no
   result may be reported as real dollars saved.
 - **Overview: accepted**, with two questions raised: whether retrieval should feed
   the prediction, not only explain it; and whether a simple version wastes training

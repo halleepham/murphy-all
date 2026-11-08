@@ -16,7 +16,7 @@ check once a cost estimate exists. Thin evidence was not chosen. **The band is m
 flip check and the app's verdict are not built.**
 
 **Consequence:** a firm "consider changing" now starts at 60% risk, not the 50% chosen in `0013`.
-From 50% to 60% murphy says too uncertain and still lists the alternatives. The band's 60% end
+From 50% to 60% Murphy says too uncertain and still lists the alternatives. The band's 60% end
 was an AI assumption.
 
 | Forecast risk | Forecasts | Predicted miss | True miss | Changes offered at the same gain | Rescued | Needless | Made worse | Both missed |
@@ -46,15 +46,15 @@ only when the inbound's delay so far, minus its scheduled turn, exceeds the dead
 It then takes the next allowed flight, within the same 2 h limit. It has no forecast, so it
 checks no gain. The AI chose both details; no minimum turn is assumed.
 
-| Trips | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net per 1,000 | murphy minus rule |
+| Trips | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net per 1,000 | Murphy minus rule |
 |---|---|---|---|---|---|---|---|---|---|
-| All | murphy | 49,439 | 14,829 | 8,278 | 3,433 | 329 | 2,789 | 3.84 (3.58 to 4.07) | |
+| All | Murphy | 49,439 | 14,829 | 8,278 | 3,433 | 329 | 2,789 | 3.84 (3.58 to 4.07) | |
 | All | rule of thumb | 11,695 | 4,772 | 2,527 | 1,119 | 150 | 976 | 1.15 (1.07 to 1.23) | 2.69 (2.49 to 2.89) |
-| No overlap | murphy | 29,164 | 7,426 | 4,041 | 1,490 | 164 | 1,731 | 1.90 (1.73 to 2.05) | |
+| No overlap | Murphy | 29,164 | 7,426 | 4,041 | 1,490 | 164 | 1,731 | 1.90 (1.73 to 2.05) | |
 | No overlap | rule of thumb | 1,340 | 540 | 378 | 14 | 1 | 147 | 0.18 (0.16 to 0.21) | 1.71 (1.55 to 1.86) |
 
 Without the overlap, 97.9% of the rule's 1,340 flags truly miss, but it flags about 22 times
-less often than murphy. murphy sees 1,272 of those 1,340.
+less often than Murphy. Murphy sees 1,272 of those 1,340.
 Limit: 45 of the rule's 11,695 flags have no saved alternatives, because they were outside the
 trips saved in `0013`; they count as no change.
 
@@ -164,7 +164,7 @@ grid is 225, but the curve is flat there (0.55819 against 0.55822 at 300), and a
 
 Against climatology overall, it is better by 0.0414 (0.0395 to 0.0433). Against `final_leads` it is worse by 0.0057
 (0.0053 to 0.0060), which is the size of what the leak supplied. Hidden flights are still rated higher than others, since
-bad days show in other inputs, but well below their true rate. murphy can rarely warn about them.
+bad days show in other inputs, but well below their true rate. Murphy can rarely warn about them.
 
 **The recommendation benefit falls by more than half.** 60-minute deadline, chosen rule.
 
@@ -177,11 +177,11 @@ bad days show in other inputs, but well below their true rate. murphy can rarely
 flights:** flagged at 50%, predicted miss averages 66.5% and the true rate is 74.0%, a gap of 7.5 points against 4.4 before.
 Hidden flights are in that true rate.
 
-**Baseline.** murphy beats the rule of thumb. The schedule-only model again makes no change at 60 or 120 minutes.
+**Baseline.** Murphy beats the rule of thumb. The schedule-only model again makes no change at 60 or 120 minutes.
 
-| Trips | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net per 1,000 | murphy minus rule |
+| Trips | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net per 1,000 | Murphy minus rule |
 |---|---|---|---|---|---|---|---|---|---|
-| All, hidden | murphy | 31,187 | 7,466 | 3,614 | 1,700 | 248 | 1,904 | 1.63 (1.48 to 1.75) |  |
+| All, hidden | Murphy | 31,187 | 7,466 | 3,614 | 1,700 | 248 | 1,904 | 1.63 (1.48 to 1.75) |  |
 | All, hidden | schedule | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 1.63 (1.48 to 1.75) |
 | All, hidden | thumb | 1,380 | 564 | 387 | 15 | 1 | 161 | 0.19 (0.17 to 0.21) | 1.44 (1.31 to 1.56) |
 
@@ -234,26 +234,26 @@ simpler method is the table above.
 Raw files are gitignored, so every figure is recorded. Net is per 1,000 forecasts with a 95% interval
 resampling whole days. "No overlap" removes overlapping trips and alternatives.
 
-**A. Rules, by deadline.** "Flags miss" is the rule of thumb's true miss among its flags; "Also murphy" is how many of them murphy flags too.
+**A. Rules, by deadline.** "Flags miss" is the rule of thumb's true miss among its flags; "Also Murphy" is how many of them Murphy flags too.
 
-| Deadline | Trips | Rule | Forecasts | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net | murphy minus rule | Flags miss | Also murphy |
+| Deadline | Trips | Rule | Forecasts | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net | Murphy minus rule | Flags miss | Also Murphy |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 30 min | All | murphy | 2,070,453 | 99,126 | 27,995 | 15,447 | 6,476 | 653 | 5,419 | 7.15 (6.69 to 7.58) |  |  |  |
+| 30 min | All | Murphy | 2,070,453 | 99,126 | 27,995 | 15,447 | 6,476 | 653 | 5,419 | 7.15 (6.69 to 7.58) |  |  |  |
 | 30 min | All | schedule-only | 2,070,453 | 159 | 55 | 17 | 11 | 6 | 21 | 0.01 (-0.00 to 0.01) | 7.14 (6.68 to 7.57) |  |  |
 | 30 min | All | rule of thumb | 2,070,453 | 21,926 | 7,446 | 4,421 | 1,149 | 156 | 1,720 | 2.06 (1.95 to 2.16) | 5.09 (4.73 to 5.44) | 82.2% | 20,834 |
-| 30 min | No overlap | murphy | 2,043,451 | 73,419 | 19,562 | 10,087 | 4,917 | 496 | 4,062 | 4.69 (4.33 to 5.04) |  |  |  |
+| 30 min | No overlap | Murphy | 2,043,451 | 73,419 | 19,562 | 10,087 | 4,917 | 496 | 4,062 | 4.69 (4.33 to 5.04) |  |  |  |
 | 30 min | No overlap | schedule-only | 2,043,451 | 153 | 52 | 16 | 11 | 4 | 21 | 0.01 (-0.00 to 0.01) | 4.69 (4.32 to 5.03) |  |  |
 | 30 min | No overlap | rule of thumb | 2,043,451 | 4,431 | 1,360 | 918 | 18 | 1 | 423 | 0.45 (0.42 to 0.48) | 4.24 (3.89 to 4.57) | 98.9% | 4,320 |
-| 60 min | All | murphy | 2,070,453 | 49,439 | 14,829 | 8,278 | 3,433 | 329 | 2,789 | 3.84 (3.58 to 4.07) |  |  |  |
+| 60 min | All | Murphy | 2,070,453 | 49,439 | 14,829 | 8,278 | 3,433 | 329 | 2,789 | 3.84 (3.58 to 4.07) |  |  |  |
 | 60 min | All | schedule-only | 2,070,453 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 3.84 (3.58 to 4.07) |  |  |
 | 60 min | All | rule of thumb | 2,070,453 | 11,695 | 4,772 | 2,527 | 1,119 | 150 | 976 | 1.15 (1.07 to 1.23) | 2.69 (2.49 to 2.89) | 72.5% | 10,369 |
-| 60 min | No overlap | murphy | 2,043,451 | 29,164 | 7,426 | 4,041 | 1,490 | 164 | 1,731 | 1.90 (1.73 to 2.05) |  |  |  |
+| 60 min | No overlap | Murphy | 2,043,451 | 29,164 | 7,426 | 4,041 | 1,490 | 164 | 1,731 | 1.90 (1.73 to 2.05) |  |  |  |
 | 60 min | No overlap | schedule-only | 2,043,451 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 1.90 (1.73 to 2.05) |  |  |
 | 60 min | No overlap | rule of thumb | 2,043,451 | 1,340 | 540 | 378 | 14 | 1 | 147 | 0.18 (0.16 to 0.20) | 1.71 (1.55 to 1.86) | 97.9% | 1,272 |
-| 120 min | All | murphy | 2,070,453 | 19,196 | 7,019 | 3,599 | 1,572 | 231 | 1,617 | 1.63 (1.46 to 1.79) |  |  |  |
+| 120 min | All | Murphy | 2,070,453 | 19,196 | 7,019 | 3,599 | 1,572 | 231 | 1,617 | 1.63 (1.46 to 1.79) |  |  |  |
 | 120 min | All | schedule-only | 2,070,453 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 1.63 (1.46 to 1.79) |  |  |
 | 120 min | All | rule of thumb | 2,070,453 | 3,390 | 1,966 | 943 | 620 | 65 | 338 | 0.42 (0.38 to 0.48) | 1.20 (1.07 to 1.35) | 64.1% | 2,565 |
-| 120 min | No overlap | murphy | 2,043,451 | 11,274 | 3,533 | 1,919 | 570 | 104 | 940 | 0.89 (0.78 to 1.00) |  |  |  |
+| 120 min | No overlap | Murphy | 2,043,451 | 11,274 | 3,533 | 1,919 | 570 | 104 | 940 | 0.89 (0.78 to 1.00) |  |  |  |
 | 120 min | No overlap | schedule-only | 2,043,451 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 0.89 (0.78 to 1.00) |  |  |
 | 120 min | No overlap | rule of thumb | 2,043,451 | 175 | 108 | 80 | 6 | 1 | 21 | 0.04 (0.03 to 0.05) | 0.85 (0.74 to 0.96) | 96.0% | 152 |
 
@@ -436,15 +436,15 @@ resampling whole days. "No overlap" removes overlapping trips and alternatives.
 
 **E. `final_clean`: rules, by deadline.**
 
-| Deadline | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net | murphy minus rule | Flags miss | Also murphy |
+| Deadline | Rule | Flagged | Changes | Rescued | Needless | Made worse | Both missed | Net | Murphy minus rule | Flags miss | Also Murphy |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 30 min | murphy | 80,062 | 21,249 | 10,228 | 5,430 | 663 | 4,928 | 4.62 (4.23 to 4.97) |  |  |  |
+| 30 min | Murphy | 80,062 | 21,249 | 10,228 | 5,430 | 663 | 4,928 | 4.62 (4.23 to 4.97) |  |  |  |
 | 30 min | schedule | 159 | 59 | 18 | 14 | 6 | 21 | 0.01 (-0.00 to 0.01) | 4.61 (4.22 to 4.96) |  |  |
 | 30 min | thumb | 4,550 | 1,442 | 941 | 24 | 4 | 473 | 0.45 (0.42 to 0.49) | 4.17 (3.80 to 4.51) | 98.5% | 4,442 |
-| 60 min | murphy | 31,187 | 7,466 | 3,614 | 1,700 | 248 | 1,904 | 1.63 (1.48 to 1.75) |  |  |  |
+| 60 min | Murphy | 31,187 | 7,466 | 3,614 | 1,700 | 248 | 1,904 | 1.63 (1.48 to 1.75) |  |  |  |
 | 60 min | schedule | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 1.63 (1.48 to 1.75) |  |  |
 | 60 min | thumb | 1,380 | 564 | 387 | 15 | 1 | 161 | 0.19 (0.17 to 0.21) | 1.44 (1.31 to 1.56) | 97.2% | 1,308 |
-| 120 min | murphy | 10,237 | 2,388 | 1,007 | 572 | 132 | 677 | 0.42 (0.38 to 0.48) |  |  |  |
+| 120 min | Murphy | 10,237 | 2,388 | 1,007 | 572 | 132 | 677 | 0.42 (0.38 to 0.48) |  |  |  |
 | 120 min | schedule | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 (0.00 to 0.00) | 0.42 (0.38 to 0.48) |  |  |
 | 120 min | thumb | 176 | 108 | 79 | 6 | 1 | 22 | 0.04 (0.03 to 0.05) | 0.38 (0.34 to 0.44) | 96.0% | 148 |
 

@@ -71,7 +71,7 @@ would be trivially true for this rule. A simple baseline that actually acts is n
 
 ## Decision 1 — The cutoffs
 
-**Human design:** the owner required that murphy change a flight only when really needed
+**Human design:** the owner required that Murphy change a flight only when really needed
 (`0010` Decision 2), and asked for the options laid out rather than choosing without them.
 
 **AI recommended, owner accepted, 6 Nov 2026:**
