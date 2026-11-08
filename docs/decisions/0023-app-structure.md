@@ -71,3 +71,13 @@ lead-time view, the map) each land in a known place instead of piling onto one p
 
 - Owner's feedback on the results page.
 - Before the chart: whether the forecast supports any deadline, or only 30, 60 and 120 minutes.
+
+## Change, 8 Nov 2026: Ask murphy floats
+
+**Owner:** the side panel should not have its own scroll and should give the main column more room;
+asked whether it could fold sideways, or open from a floating button in the corner.
+**AI:** all three are possible (fold sideways, floating button, or both by screen width); recommended
+the floating button. **Owner chose the floating button.** The results page now uses the full width;
+a round button at the bottom right opens Ask murphy as a card over the page (× or Esc closes it).
+Only the card's messages scroll, since an overlay cannot grow past the screen. Checked in headless
+Chrome at 1400 and 500 px wide.

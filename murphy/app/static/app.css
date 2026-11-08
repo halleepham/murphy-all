@@ -90,19 +90,27 @@ blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--lin
 .chart-box { position: relative; height: 260px; cursor: crosshair; touch-action: none; }
 .whatif p { margin: 8px 0 0; }
 
-/* Results page: content on the left, Ask sidebar on the right */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; max-width: 1280px; }
-.assistant { position: sticky; top: 16px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 10px; }
+/* Results page: content at full width; Ask murphy floats over it from the corner button */
+.layout { max-width: 1280px; }
+.assistant { position: fixed; right: 24px; bottom: 92px; z-index: 50; width: min(380px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 120px)); display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); outline: none; }
+.assistant[hidden] { display: none; }
+.assistant-head { display: flex; align-items: center; justify-content: space-between; }
 .assistant h2 { font-size: 1.05rem; }
+.assistant .close { background: none; border: 0; font-size: 1.5rem; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px; }
+.fab { position: fixed; right: 24px; bottom: 24px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0;
+  background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center; box-shadow: 0 6px 20px rgba(0, 0, 0, .3); }
+.fab[aria-expanded="true"] { filter: brightness(.9); }
+@media (prefers-color-scheme: dark) { .fab { color: #0d1420; } }
 .assistant p { margin: 0; }
-.chat { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.chat { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .chat:empty { display: none; }
 .msg { padding: 8px 12px; border-radius: 10px; font-size: .9rem; }
 .msg p { margin: 0 0 6px; }
 .msg.you { align-self: flex-end; background: var(--accent-soft); max-width: 85%; }
 .msg.bot { background: var(--bg); border: 1px solid var(--line); }
 .assistant .examples .chip { text-align: left; }
-@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .assistant { position: static; max-height: none; } }
 .prose { max-width: 42em; }
 .prose h2 { margin: 28px 0 8px; font-size: 1.2rem; }
 
