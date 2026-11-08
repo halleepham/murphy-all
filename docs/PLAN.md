@@ -151,6 +151,9 @@ Refit as `final_network`; Brier slightly better, net per 1,000 about the same, s
   comparison against a simpler method, such as BM25.
 - **Trust.** The three parts above.
 
+*Built (`0018`):* the graph, 6 node types and 9 relationship types over 4–12 Jan 2025, with
+fixed queries. GraphRAG, vector retrieval and policies are next.
+
 ### 6. GenAI.
 
 Itinerary text → validated schema; plain-language explanations; at least one
