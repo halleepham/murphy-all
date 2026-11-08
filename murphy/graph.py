@@ -148,7 +148,7 @@ QUERIES = {
     "alternatives": ("Traversal: alternatives offered at a lead, least likely to miss first",
         """MATCH (a:Flight)-[r:ALTERNATIVE_FOR {lead_h: $lead_h}]->(f:Flight {id: $flight_id}), (a)-[:MARKETED_BY]->(c:Carrier)
            RETURN a.id AS alternative, c.code AS carrier, a.crs_dep_local AS dep_local, r.arr_ahead_min AS arr_ahead_min,
-                  r.p_miss AS p_miss, f['p_miss_' + toString($lead_h) + 'h'] AS current_p_miss
+                  r.p_miss AS alt_p_miss, f['p_miss_' + toString($lead_h) + 'h'] AS trip_p_miss
            ORDER BY r.p_miss LIMIT 5"""),
     "why": ("Multi-hop: weather known at as_of at the origin and the airports that usually go bad with it",
         f"""MATCH (f:Flight {{id: $flight_id}})-[:DEPARTS_FROM]->(o:Airport)-[:IN_COMMUNITY]->(c:Community)
@@ -161,7 +161,8 @@ QUERIES = {
            WITH f, o, c, as_of, x, head(collect(m)) AS m
            RETURN f.id AS flight, as_of, o.iata AS origin, c.id AS community, c.busiest[0..4] AS community_busiest,
                   x.airport AS airport, x.weight AS co_disruption_weight,
-                  m.id AS metar_id, m.known_at AS metar_known_at, m.metar AS metar
+                  m.id AS metar_id, m.known_at AS metar_known_at, m.metar AS metar, m.tmpf AS temp_f, m.sknt AS wind_kt,
+                  m.gust AS gust_kt, m.vsby AS visibility_mi, m.wxcodes AS weather_codes
            ORDER BY x.weight IS NULL DESC, x.weight DESC"""),
     "taf": ("Multi-hop: the latest TAF for the origin known at as_of",
         f"""MATCH (f:Flight {{id: $flight_id}})-[:DEPARTS_FROM]->(o:Airport)<-[:REPORTED_AT]-(t:Taf)

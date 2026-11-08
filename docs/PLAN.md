@@ -64,7 +64,7 @@ flight, so they are stated limitations, not per-flight signals.
 | Are recommendations good? | No change at all; a traveler's rule of thumb (`0014`). Climatology and the schedule-only model almost never act | Measured on 2025 with `final_clean` (`0014` Finding 3) |
 | Do trust checks help? | The recommender with and without them | Not built |
 | Is retrieval good? | Vector vs BM25 | Not built |
-| Are answers grounded? | GraphRAG vs plain retrieval; every value traces to a source | Not built |
+| Are answers grounded? | GraphRAG vs plain retrieval; every value traces to a source | First run on 4 flights (`0019` Finding 2): graph 6 of 7 key facts, BM25 5 of 7, none 0 |
 
 **Are recommendations good?** Replay real trips, assuming the traveler takes the
 recommendation. Keeping the flight is the default. Did we correctly predict that the
@@ -152,7 +152,10 @@ Refit as `final_network`; Brier slightly better, net per 1,000 about the same, s
 - **Trust.** The three parts above.
 
 *Built (`0018`):* the graph, 6 node types and 9 relationship types over 4–12 Jan 2025, with
-fixed queries. GraphRAG, vector retrieval and policies are next.
+fixed queries.
+
+*Built (`0019`):* GraphRAG over suggested questions, compared with no communities, BM25 and
+no retrieval on 4 flights. Not yet in the app. Vector retrieval and policies are next.
 
 ### 6. GenAI.
 

@@ -22,7 +22,8 @@ needs a newer torch than this machine's ceiling of 2.2.2.
 
 - **Primary: Groq's free tier.** It supports strict JSON schemas and has a
   vision model, and per its docs it does not retain inference data by default.
-  Free-plan limits are UNVERIFIED.
+  Free-plan limits are UNVERIFIED. **Measured 7 Nov 2026:** `openai/gpt-oss-120b` stops at
+  200,000 tokens per day (Groq's 429 message, `0019`), about 1,000 tokens per GraphRAG answer.
 - **Fallback:** a local model through Ollama, which ships a universal binary.
   Its speed on this Mac has not been measured.
 - **Rejected: Gemini's free tier for user data.** Its terms say free-tier
