@@ -91,3 +91,28 @@ header tooltip). Fields equal in every row are written once above the table; a s
 as a two-column table. Source ids, "known at" times and the raw METAR sit in a tooltip on each [E]
 tag, so every row stays traceable. Checked in headless Chrome on real evidence rows saved in
 `data/graphrag/eval.jsonl`; no new Groq calls were made.
+
+## Change, 8 Nov 2026: plain words first, detail folded
+
+**Owner:** the weather and linked-airport text was hard to follow ("I don't really know what the
+second sentence is"); show user-understandable labels and explanations, and hide technical detail in
+a collapsible, across the whole app. **AI proposed** a rule for every section, with three choices;
+**owner accepted all recommendations.**
+
+- **Rule:** visible text answers the traveler in one or two plain sentences, with no model or
+  data jargon (GCN, TAF, METAR, UTC, kt, link weight, decision numbers). "How to read this" folds
+  explain what rows, colors and lines mean. "Technical details" folds keep the model, sources, raw
+  reports, accuracy figures and decision records, so evidence and provenance stay on the page.
+- **Choices:** wind in mph (knots only in the details); local times everywhere (UTC only in the
+  details); areas named by their busiest airports ("ATL, MCO, MIA area"), from the Community nodes
+  in Neo4j, exported by `scripts/export_links.py` to `community_busiest.parquet`.
+- **Weather:** per airport, one line for the flight time ("Expected around then: low clouds (down to
+  700 ft), freezing rain or drizzle, ice pellets") and one short "Right now" line; the full forecast
+  and the original reports are folded.
+- **Linked airports:** what a link means is stated; "Why these three?" says the `0022` result in
+  plain words: 45% of the model's picks were among the 3 worst-hit linked airports, against 30% for
+  the thickest lines and 29% for random.
+- Also: "Past accuracy" instead of "Track record", "not tested" instead of "not checked", "Compared
+  with yours: +52 points" instead of "Gain +52 pts"; similarity scores and passage hashes folded.
+- Not changed: the similar-days sentences from `0020` still say "kt"; they are the text the search
+  embeds, so rewording them means rebuilding that index.

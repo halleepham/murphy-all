@@ -171,3 +171,7 @@ table.ev td.long { min-width: 16em; font-family: ui-monospace, Menlo, monospace;
 table.ev th[title] { text-decoration: underline dotted; cursor: help; }
 table.ev.kv th { width: 40%; }
 table.ev td.traced { text-decoration: underline dotted; cursor: help; }
+/* Folds (0023): "How to read this" and "Technical details" */
+details.fold { margin-top: 8px; }
+details.fold > summary { font-size: .82rem; }
+details.fold > p, details.fold > ul { margin: 6px 0 0 14px; }

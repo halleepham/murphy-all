@@ -12,8 +12,8 @@ def test_codes_become_words_and_unknown_letters_are_kept():
 
 
 def test_wind_visibility_and_sky():
-    assert wt.wind(310, 24, 39) == "wind from the northwest at 24 kt, gusts to 39 kt"
-    assert wt.wind(np.nan, np.nan, np.nan, "FM170000 VRB04KT P6SM FEW250") == "wind variable direction at 4 kt"
+    assert wt.wind(310, 24, 39) == "wind from the northwest at 28 mph, gusts to 45 mph"
+    assert wt.wind(np.nan, np.nan, np.nan, "FM170000 VRB04KT P6SM FEW250") == "wind variable direction at 5 mph"
     assert wt.wind(0, 0, np.nan) == "calm wind" and wt.wind(np.nan, np.nan, np.nan) == "wind not reported"
     assert wt.visibility(6.01) == "visibility over 6 miles" and wt.visibility(1) == "visibility 1 mile"
     assert wt.sky(["CLR"], [np.nan]) == "clear sky"
@@ -26,8 +26,8 @@ def item(**kw):
 
 def test_flags_follow_the_thresholds_and_not_lookalike_codes():
     assert wt.notable([item(gust=29.0), item(sknt=19.0), item(vis=3.0)]) == []
-    assert wt.notable([item(gust=30.0, vis=2.9)]) == ["strong gusts", "poor visibility"]
-    assert wt.notable([item(skyc=["BKN"], skyl=[900])]) == ["low clouds"]
+    assert wt.notable([item(gust=30.0, vis=2.9)]) == ["strong gusts (up to 35 mph)", "poor visibility (down to 2.9 miles)"]
+    assert wt.notable([item(skyc=["BKN"], skyl=[900])]) == ["low clouds (down to 900 ft)"]
     assert wt.notable([item(skyc=["SCT"], skyl=[500])]) == []          # scattered is not a ceiling
     assert wt.notable([item(codes=["VCSH", "BR"])]) == []             # showers nearby, mist
     assert wt.notable([item(codes=["-FZRA", "BCFG"])]) == ["freezing rain or drizzle", "fog"]
@@ -68,4 +68,11 @@ def test_observation_with_blanks_says_not_reported():
                    **{f"skyl{i}": np.nan for i in range(1, 5)}})
     o = wt.obs_text(r, "America/New_York")
     assert o["text"] == "Wind not reported; visibility not reported; sky not reported."
-    assert o["when"] == "Observed Thu 13:52 local"
+    assert o["when"] == "Observed Thu 1:52 pm"
+
+
+def test_short_line_keeps_only_what_a_traveler_needs():
+    r = pd.Series({"wxcodes": "-SN BR", "tmpf": 33.0, "drct": 310.0, "sknt": 11.0, "gust": np.nan, "vsby": 2.0,
+                   "obs_utc": pd.Timestamp("2025-03-16 18:11"), "skyc1": "FEW", "skyc2": "BKN", "skyc3": np.nan, "skyc4": np.nan,
+                   "skyl1": 700.0, "skyl2": 1600.0, "skyl3": np.nan, "skyl4": np.nan})
+    assert wt.obs_text(r, "America/Chicago")["short"] == "light snow, mist, 33°F, wind 13 mph, cloudy, visibility 2 miles"

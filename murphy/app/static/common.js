@@ -10,3 +10,11 @@ async function get(url) {
   if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request failed");
   return body;
 }
+
+// A folded section: "How to read this" for plain explanations, "Technical details" for sources and
+// model detail (0023). Items are strings (one paragraph each) or elements.
+function fold(summary, ...items) {
+  const d = el("details", null, "fold");
+  d.append(el("summary", summary, "small"), ...items.filter(x => x != null && x !== "").map(x => typeof x === "string" ? el("p", x, "muted small") : x));
+  return d;
+}

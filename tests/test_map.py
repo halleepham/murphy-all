@@ -57,7 +57,7 @@ def test_gcn_order_differs_from_the_simpler_link_weight_order():
 
 def test_small_origin_is_limited_not_empty_handed():
     lk = build(origin="SSS", dest="AAA")["links"]
-    assert lk["limited"] and lk["neighbors"] == [] and "100 big airports" in lk["reason"]
+    assert lk["limited"] and lk["neighbors"] == [] and "100 busiest" in lk["reason"]
 
 
 def test_hours_before_the_arrays_are_blank_not_zero():
@@ -69,12 +69,12 @@ def test_hours_before_the_arrays_are_blank_not_zero():
 def test_airport_without_coordinates_is_left_off_and_counted():
     d = build(dest="NOC")
     assert d["route"]["dest"] is None and "NOC" not in {a["airport"] for a in d["airports"]}
-    assert any("without coordinates are left off the map: 1" in x for x in d["uncertainty"]["limits"])
+    assert any("lack of coordinates: 1" in x for x in d["uncertainty"]["limits"])
 
 
 def test_weather_outside_the_30_airports_is_limited():
     w = mapdata.weather_at("SSS", pd.Timestamp(AS_OF))
-    assert w["limited"] and "30 airports" in w["reason"]
+    assert w["limited"] and "30 large airports" in w["reason"]
 
 
 def test_hour_rule_matches_the_why_query():
@@ -106,3 +106,12 @@ def test_endpoint_refuses_unknown_flight_and_missing_files(client):
     assert client().get("/api/map", params={"flight_id": "nope"}).status_code == 404
     assert client().get("/api/map", params={"flight_id": "f1", "lead_h": 5}).status_code == 422
     assert client(files=False).get("/api/map", params={"flight_id": "f1"}).status_code == 503
+
+
+def test_regions_are_named_by_their_busiest_airports_and_hours_are_local():
+    d = mapdata.build("AAA", "SSS", AS_OF, scores(), BIG, PLACES.assign(tz="America/New_York"), LINKS, wx,
+                      names={0: ["BBB", "AAA", "NOC", "ZZZ"]})
+    r = {g["community"]: g["name"] for g in d["regions"]}
+    assert r == {0: "BBB, AAA, NOC area", 1: "Region 1"}       # no list for region 1: said plainly
+    assert d["hours_local"][-1] == "Mon 12:00 am"              # 05:00 UTC in New York, 2 Jan 2023
+    assert build()["hours_local"][-1] == "Mon 5:00 am UTC"      # no time zone known: says UTC

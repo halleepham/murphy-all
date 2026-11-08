@@ -16,6 +16,7 @@ HOURS_BACK = 24  # the slider runs from 24 h before the forecast hour up to it
 LINKS = ROOT / "data" / "forecast" / "network" / "co_disrupts.parquet"  # scripts/export_links.py
 COMMUNITIES = ROOT / "data" / "forecast" / "network" / "communities.csv"
 AIRPORTS = ROOT / "data" / "airports.parquet"
+NAMES = ROOT / "data" / "forecast" / "network" / "community_busiest.parquet"  # scripts/export_links.py
 
 
 @functools.cache
@@ -25,9 +26,10 @@ def inputs() -> dict | None:
     if s is None or not (LINKS.exists() and AIRPORTS.exists()):
         return None
     cm = pd.read_csv(COMMUNITIES, keep_default_na=False)
-    ap = pd.read_parquet(AIRPORTS, columns=["airport", "name", "lat", "lon"])
+    ap = pd.read_parquet(AIRPORTS, columns=["airport", "name", "lat", "lon", "tz"]).drop_duplicates("airport")
+    names = pd.read_parquet(NAMES).set_index("community").busiest.map(list).to_dict() if NAMES.exists() else None
     return {"scores": s[0], "big": s[1], "places": cm.merge(ap, on="airport", how="left"),
-            "links": pd.read_parquet(LINKS), "weather": weather_at}
+            "links": pd.read_parquet(LINKS), "weather": weather_at, "names": names}
 
 
 def weather_at(airport: str, as_of, around=None) -> dict:
@@ -38,7 +40,8 @@ def weather_at(airport: str, as_of, around=None) -> dict:
     from murphy.datalayer import asof
     from murphy.datalayer.weather import AIRPORTS as WX
     if airport not in WX:
-        return {"airport": airport, "limited": True, "reason": f"No weather data for {airport}: murphy has it for 30 airports."}
+        return {"airport": airport, "limited": True,
+                "reason": f"murphy has weather reports for 30 large airports, and {airport} is not one of them."}
     t = pd.Timestamp(as_of).tz_localize("UTC").to_pydatetime()
     obs, taf = asof.asos_as_of(t, airport, lookback_hours=3), asof.taf_as_of(t, airport)
     tz = pd.read_parquet(AIRPORTS, columns=["airport", "tz"]).set_index("airport").tz.get(airport)
@@ -49,7 +52,7 @@ def weather_at(airport: str, as_of, around=None) -> dict:
             "flight_time": None if around is None else wt.local(around, tz),
             "notable_now": wt.notable([o] if o else []),
             "notable_at_flight": wt.notable(near) if near else None,  # None: the TAF does not reach the flight
-            "metar": None if o is None else {"plain": {"when": o["when"], "text": o["text"]}, "text": obs.metar.iloc[-1],
+            "metar": None if o is None else {"plain": {"when": o["when"], "text": o["text"], "short": o["short"]}, "text": obs.metar.iloc[-1],
                                              "obs_utc": str(obs.obs_utc.iloc[-1]), "known_at": str(obs.known_at.iloc[-1])},
             "taf": None if taf.empty else {"issued_utc": str(taf.issued_utc.iloc[0]), "issued_local": wt.local(taf.issued_utc.iloc[0], tz),
                                            "plain": [{k: x[k] for k in ("when", "text", "near")} for x in lines],
@@ -59,7 +62,7 @@ def weather_at(airport: str, as_of, around=None) -> dict:
 
 
 def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame, links: pd.DataFrame, weather,
-          dep_utc=None, arr_utc=None) -> dict:
+          dep_utc=None, arr_utc=None, names: dict | None = None) -> dict:
     h = rank.hour_index(as_of)
     rows = list(range(h - HOURS_BACK, h + 1))  # oldest first; the last is the forecast hour
     ok = [0 <= r < len(scores) for r in rows]
@@ -69,7 +72,9 @@ def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame
     regions = []
     for c, g in places.groupby("community"):
         scored = [a for a in g.airport if a in gcn]
-        regions.append({"community": int(c), "airports": len(g), "airports_scored": len(scored),
+        busy = (names or {}).get(int(c))  # a region is named after its busiest airports, not a number
+        regions.append({"community": int(c), "name": f"{', '.join(busy[:3])} area" if busy else f"Region {c}",
+                        "airports": len(g), "airports_scored": len(scored),
                         "risk": [fmean(v) if (v := [gcn[a][j] for a in scored if gcn[a][j] is not None]) else None
                                  for j in range(len(rows))]})
 
@@ -85,15 +90,20 @@ def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame
         lk = {"limited": False, "neighbors": nb, "top_by_weight": by_weight, "top_by_gcn": by_gcn}
     else:
         lk = {"limited": True, "neighbors": [], "top_by_weight": [], "top_by_gcn": [],
-              "reason": f"{origin} is not one of the 100 big airports the co-disruption links and GCN cover."}
+              "reason": f"{origin} is a smaller airport. Linked airports are worked out only for the 100 busiest US airports."}
 
     def place(a):
         p = places[places.airport == a]
-        return None if p.empty or p.lat.isna().iloc[0] else {"airport": a, "name": p.name.iloc[0],
+        tz = p.tz.iloc[0] if "tz" in p and not p.empty and isinstance(p.tz.iloc[0], str) else None
+        return None if p.empty or p.lat.isna().iloc[0] else {"airport": a, "name": p.name.iloc[0], "tz": tz,
                                                            "lat": float(p.lat.iloc[0]), "lon": float(p.lon.iloc[0])}
+    from murphy.wxtext import local
     first = pd.Timestamp(rank.START)
+    hours = [first + pd.Timedelta(hours=r) for r in rows]
+    otz = (place(origin) or {}).get("tz")
     return {"route": {"origin": place(origin), "dest": place(dest)},
-            "hours_utc": [str(first + pd.Timedelta(hours=r)) for r in rows],
+            "hours_utc": [str(t) for t in hours],
+            "hours_local": [local(t, otz) for t in hours],  # at the origin; says UTC when its zone is unknown
             "airports": have[["airport", "name", "lat", "lon", "community", "big"]].assign(
                 big=have.big.astype(str) == "True", community=have.community.astype(int)).to_dict("records"),
             "gcn": gcn, "regions": regions, "links": lk,
@@ -104,9 +114,14 @@ def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame
                            "forecast_as_of_utc": str(as_of), "forecast_hour_utc": str(first + pd.Timedelta(hours=h)),
                            "decisions": ["0025"]},
             "uncertainty": {"limits": [
-                "Forecasts only, never what happened. The slider stops at the trip's forecast hour.",
-                "Region shading uses the 100 big airports only.",
-                f"Airports without coordinates are left off the map: {len(places) - len(have)}.",
-                "Weather covers 30 airports."],
-                "gcn_order": "On 2025 hours, the GCN's top 3 neighbors were among the 3 worst 45% of the time; "
-                             "the top 3 by link weight 30%, about the same as random (0022 Finding 1)."}}
+                "The map shows forecasts only, never what happened. The slider stops when your forecast was made.",
+                "Area colors average the 100 busiest airports only.",
+                f"Airports left off the map for lack of coordinates: {len(places) - len(have)}.",
+                "Weather reports cover 30 large airports."],
+                # 0022 Finding 1, in plain words: hit share 0.450 (GCN) vs 0.299 (link weight) vs 0.294 (random)
+                "why_these": "murphy picks them with a model of how delays spread between airports. In tests on "
+                             "2025, 45% of its picks turned out to be among the 3 worst-hit linked airports over the "
+                             "next 3 hours. Picking the airports with the thickest lines got 30%, about the same as "
+                             "picking at random (29%).",
+                "gcn_order": "Hit share of the top 3 by GCN 0.450 vs by link weight 0.299 vs random 0.294, "
+                             "on 653,549 airport-hours of 2025 (0022 Finding 1)."}}

@@ -21,9 +21,11 @@ OVER_6 = 6.01  # IEM stores "P6SM" (more than 6 statute miles) as 6.01
 VRB = re.compile(r"\bVRB(\d{2,3})(?:G(\d{2,3}))?KT\b")  # the TAF parser leaves speed blank for variable wind
 # murphy's own simple thresholds for "notable", not an aviation standard (AI choice, untested)
 WIND_KT, GUST_KT, VIS_MI, CEILING_FT = 20, 30, 3, 1000
+MPH = 1.15078  # knots to miles per hour: reports use knots, travelers read mph
 SERIOUS = {"TS": "thunderstorms", "SN": "snow", "FZ": "freezing rain or drizzle", "PL": "ice pellets",
            "FG": "fog", "GR": "hail"}
-THRESHOLDS = (f"wind {WIND_KT} kt or more, gusts {GUST_KT} kt or more, visibility under {VIS_MI} miles, "
+THRESHOLDS = (f"wind {WIND_KT * MPH:.0f} mph ({WIND_KT} kt) or more, gusts {GUST_KT * MPH:.0f} mph ({GUST_KT} kt) or more, "
+              f"visibility under {VIS_MI} miles, "
               f"broken or overcast clouds under {CEILING_FT:,} ft, or " + ", ".join(SERIOUS.values()))
 NEAR_H = 1         # a forecast period counts for the flight if it overlaps the flight time +/- this
 # Periods have no stored end, so the last runs to issue + span. Measured on 2025 TAFs: periods start up to
@@ -39,8 +41,13 @@ def _num(v):
 
 
 def local(ts, tz: str | None) -> str:
-    t = pd.Timestamp(ts).tz_localize("UTC")
-    return t.tz_convert(tz).strftime("%a %H:%M local") if tz else t.strftime("%a %H:%M UTC")
+    """'Thu 3:51 pm' in the airport's time zone (UTC, said so, when the zone is unknown)."""
+    t = pd.Timestamp(ts)
+    t = t.tz_convert("UTC") if t.tzinfo else t.tz_localize("UTC")
+    if tz:
+        t = t.tz_convert(tz)
+    out = t.strftime("%a %-I:%M ") + t.strftime("%p").lower()
+    return out if tz else out + " UTC"
 
 
 def phrase(code: str) -> str:
@@ -69,7 +76,19 @@ def wind(drct, sknt, gust, raw: str = "") -> str:
     if s == 0:
         return "calm wind"
     frm = "variable direction" if d is None else "from the " + COMPASS[round(d / 22.5) % 16]
-    return f"wind {frm} at {s:.0f} kt" + (f", gusts to {g:.0f} kt" if g else "")
+    return f"wind {frm} at {s * MPH:.0f} mph" + (f", gusts to {g * MPH:.0f} mph" if g else "")
+
+
+def short_sky(codes, heights) -> str:
+    """'clear', 'some clouds', 'cloudy' or 'low clouds': the visible line; heights stay in the full text."""
+    layers = [(c, _num(h)) for c, h in zip(codes, list(heights) + [None] * len(codes)) if c]
+    if any(c in ("BKN", "OVC", "VV") and h is not None and h < CEILING_FT for c, h in layers):
+        return "low clouds"
+    if any(c in ("BKN", "OVC", "VV") for c, _ in layers):
+        return "cloudy"
+    if any(c in ("FEW", "SCT") for c, _ in layers):
+        return "some clouds"
+    return "clear" if layers else ""
 
 
 def visibility(v) -> str:
@@ -98,8 +117,11 @@ def obs_text(r, tz) -> dict:
     codes = r.wxcodes.split() if isinstance(r.wxcodes, str) else []
     skyc = [c for c in (getattr(r, f"skyc{i}") for i in range(1, 5)) if isinstance(c, str)]
     skyl = [getattr(r, f"skyl{i}") for i in range(1, 5)]
-    t = _num(r.tmpf)
-    return {"when": f"Observed {local(r.obs_utc, tz)}",
+    t, s, g, v = _num(r.tmpf), _num(r.sknt), _num(r.gust), _num(r.vsby)
+    brief = [", ".join(phrase(c) for c in codes), f"{t:.0f}°F" if t is not None else "",
+             "" if s is None else "calm" if s == 0 else f"wind {s * MPH:.0f} mph" + (f", gusts {g * MPH:.0f} mph" if g else ""),
+             short_sky(skyc, skyl), f"visibility {v:g} miles" if v is not None and v < VIS_MI else ""]
+    return {"when": f"Observed {local(r.obs_utc, tz)}", "short": ", ".join(x for x in brief if x),
             "text": sentence([", ".join(phrase(c) for c in codes), f"{t:.0f}°F" if t is not None else "",
                               wind(r.drct, r.sknt, r.gust), visibility(r.vsby), sky(skyc, skyl)]),
             "codes": codes, "skyc": skyc, "skyl": skyl, "sknt": _num(r.sknt), "gust": _num(r.gust), "vis": _num(r.vsby)}
@@ -136,21 +158,25 @@ def taf_lines(periods: pd.DataFrame, tz, around=None) -> list[dict]:
 
 
 def notable(items: list[dict]) -> list[str]:
-    """Conditions past the thresholds above, in any of the items, each named once."""
+    """Conditions past the thresholds above, in any of the items, each named once, with the worst value."""
     found = []
     def add(s):
         if s not in found:
             found.append(s)
+    wind_ = [x["sknt"] for x in items if (x["sknt"] or 0) >= WIND_KT]
+    gust = [x["gust"] for x in items if (x["gust"] or 0) >= GUST_KT]
+    vis = [x["vis"] for x in items if x["vis"] is not None and x["vis"] < VIS_MI]
+    ceil = [_num(h) for x in items for c, h in zip(x["skyc"], x["skyl"])
+            if c in ("BKN", "OVC", "VV") and _num(h) is not None and _num(h) < CEILING_FT]
+    if wind_:
+        add(f"strong wind (up to {max(wind_) * MPH:.0f} mph)")
+    if gust:
+        add(f"strong gusts (up to {max(gust) * MPH:.0f} mph)")
+    if vis:
+        add(f"poor visibility (down to {min(vis):g} mile{'' if min(vis) == 1 else 's'})")
+    if ceil:
+        add(f"low clouds (down to {min(ceil):,.0f} ft)")
     for x in items:
-        if (x["sknt"] or 0) >= WIND_KT:
-            add("strong wind")
-        if (x["gust"] or 0) >= GUST_KT:
-            add("strong gusts")
-        if x["vis"] is not None and x["vis"] < VIS_MI:
-            add("poor visibility")
-        if any(c in ("BKN", "OVC", "VV") and _num(h) is not None and _num(h) < CEILING_FT
-               for c, h in zip(x["skyc"], x["skyl"])):
-            add("low clouds")
         for c in x["codes"]:
             body = c.lstrip("+-")
             for k in (body[i:i + 2] for i in range(0, len(body), 2)):  # two-letter groups, e.g. FZ RA

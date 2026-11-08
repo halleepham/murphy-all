@@ -40,7 +40,7 @@
 
  <aside class="assistant card" id="assistant" hidden aria-label="Ask murphy">
   <div class="assistant-head"><h2>Ask murphy</h2><button type="button" class="close" id="ask-close" aria-label="Close">×</button></div>
-  <p class="muted small">Answers come from the knowledge graph. A check flags any number that is not in the evidence.</p>
+  <p class="muted small">Answers use only murphy's data about this trip. If an answer states a number that isn't in that data, it's flagged.</p>
   <div id="chat" class="chat"></div>
   <div id="asks" class="examples"></div>
  </aside>
@@ -80,7 +80,6 @@ const settings = { max_earlier_h: 2, sort: "chance" };
 let trip = null, tab = TABS.some(([k]) => "#" + k === location.hash) ? location.hash.slice(1) : "options";  // #map opens a tab directly
 
 const params = extra => new URLSearchParams({ flight_id: flightId, lead_h: $("lead").value, deadline_min: $("deadline").value, ...extra });
-const sources = (summary, ...lines) => { const d = el("details"); d.append(el("summary", summary, "small"), ...lines.map(l => el("p", l, "muted small"))); return d; };
 
 async function load() {
   try { trip = await get("/api/trip?" + params({ max_earlier_h: settings.max_earlier_h, sort: settings.sort })); }
@@ -95,10 +94,10 @@ function renderHead() {
   const change = el("a", "Check another flight", "change small"); change.href = "/"; $("head").append(change);
   $("chance").textContent = pct(a.chance);
   $("verdict").textContent = WORDS[a.verdict]; $("verdict").className = "verdict " + a.verdict;
-  $("track").textContent = `Track record: forecasts like this said ${pct(t.predicted_miss)} would miss; ${pct(t.true_miss)} did (${t.forecasts.toLocaleString("en-US")} forecasts, 2025).`;
+  $("track").textContent = `Past accuracy: for flights like this, murphy expected ${pct(t.predicted_miss)} to miss; ${pct(t.true_miss)} did.`;
   $("summary").hidden = false;
   const p = trip.provenance;
-  $("where-text").textContent = `Model ${p.model}, forecast as of ${p.forecast_as_of_utc} UTC (${p.lead_h} h before departure). ${p.data}. Flight record ${f.flight_id}. Decision records: ${p.decisions.join(", ")}. Limits are on the About page.`;
+  $("where-text").textContent = `Model ${p.model}, forecast as of ${p.forecast_as_of_utc} UTC (${p.lead_h} h before departure). ${p.data}. Flight record ${f.flight_id}. Past accuracy from ${t.forecasts.toLocaleString("en-US")} forecasts in the same risk band, 2025. Decision records: ${p.decisions.join(", ")}. Limits are on the About page.`;
   $("where").hidden = false;
 }
 
@@ -112,7 +111,7 @@ const marker = {  // the traveler's deadline, and the range past what was checke
     const { ctx, chartArea: a, scales: { x } } = c, cut = x.getPixelForValue(trip.curve.checked_to);
     ctx.save(); ctx.fillStyle = css("--line"); ctx.globalAlpha = .45; ctx.fillRect(cut, a.top, a.right - cut, a.bottom - a.top);
     ctx.globalAlpha = 1; ctx.fillStyle = css("--muted"); ctx.font = "12px " + css("--font"); ctx.textAlign = "center";
-    ctx.fillText("not checked", (cut + a.right) / 2, a.bottom - 8); ctx.restore();
+    ctx.fillText("not tested", (cut + a.right) / 2, a.bottom - 8); ctx.restore();
   },
   afterDatasetsDraw(c) {
     const { ctx, chartArea: a, scales: { x } } = c, px = x.getPixelForValue(c.$deadline);
@@ -146,7 +145,7 @@ function renderChart() {
         },
         plugins: {
           legend: { position: "top", align: "start", labels: { boxWidth: 14, boxHeight: 2 } },
-          tooltip: { callbacks: { title: i => `Deadline +${i[0].parsed.x} min` + (i[0].parsed.x > c.checked_to ? " (not checked)" : ""),
+          tooltip: { callbacks: { title: i => `Deadline +${i[0].parsed.x} min` + (i[0].parsed.x > c.checked_to ? " (not tested)" : ""),
                                   label: i => `${i.dataset.label}: ${i.parsed.y.toFixed(0)}%` } },
         },
       },
@@ -167,7 +166,7 @@ function renderChart() {
     });
   }
   const i = c.deadline_min.indexOf(deadline), alt = c.best_alt ? `, the best alternative ${pct(c.best_alt.chance[i])}` : "";
-  $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight at this lead time ${pct(c.typical[i])}. Past +${c.checked_to} min the advice was not checked, so the deadline stops there.`;
+  $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight forecast at the same time before departure ${pct(c.typical[i])}. murphy hasn't tested its advice for deadlines more than ${c.checked_to} minutes after arrival, so the deadline stops there.`;
   $("whatif").hidden = false;
 }
 
@@ -197,19 +196,19 @@ function options(box) {
   const ctl = el("div", null, "controls"); ctl.append(l1, l2); out.push(ctl);
   if (!alts.length) { out.push(el("p", "No flight leaves within your limits and arrives by the deadline.", "muted")); box.replaceChildren(...out); return; }
   const wrap = el("div", null, "scroll"), t = el("table"), head = el("tr");
-  ["", "Flight", "Departs", "Arrives", "Chance", "Gain", "New ticket (est.)"].forEach(h => head.append(el("th", h)));
+  ["", "Flight", "Departs", "Arrives", "Chance", "Compared with yours", "New ticket (est.)"].forEach(h => head.append(el("th", h)));
   t.append(head);
   alts.forEach(x => {
     const tr = el("tr", null, x.best ? "best" : "");
     [x.best ? "Best" : "", x.flight, `${x.date} ${time(x.departs_local)}`, time(x.arrives_local), pct(x.chance),
-     (x.gain >= 0 ? "+" : "") + (100 * x.gain).toFixed(0) + " pts",
+     (x.gain >= 0 ? "+" : "") + (100 * x.gain).toFixed(0) + " points",
      x.cost.fare == null ? "No estimate" : "$" + x.cost.fare.toFixed(2) + (x.same_airline ? " *" : "")].forEach(c => tr.append(el("td", c)));
     t.append(tr);
   });
   wrap.append(t); out.push(wrap);
   const notes = ["Price: the median fare paid on this route and airline (or route, if the airline has too little data), from " + alts[0].cost.source + ". One airline shows one figure, so price sorting compares airlines, not times."];
   if (alts.some(x => x.same_airline)) notes.push("* Same airline: this may cost only a fare difference, which the data does not show.");
-  out.push(sources("About the prices", ...notes));
+  out.push(fold("About the prices", ...notes));
   box.replaceChildren(...out);
 }
 
@@ -223,16 +222,16 @@ async function pastdays(box) {
   const out = [], a = d.answer, u = d.uncertainty;
   if (d.status === "no_weather") out.push(el("p", `No weather data for ${origin}. Similar past days cover the 30 busiest airports.`, "muted"));
   else if (a) {
-    out.push(el("p", `On the ${a.days} past days at ${origin} whose forecast looked most like today's, ${pct(a.late_share)} of departures were late or cancelled on average (range ${pct(a.range[0])}–${pct(a.range[1])}).`));
+    out.push(el("p", `On the ${a.days} past days at ${origin} whose forecast looked most like today's, ${pct(a.late_share)} of departures were late or cancelled on average (from ${pct(a.range[0])} to ${pct(a.range[1])} on those days).`));
     out.push(el("p", "This counts every departure from the airport that day, not your flight.", "muted small"));
   } else out.push(el("p", `${u.reason} Not enough evidence, so no percent is shown.`, "muted"));
   if (d.query) {
-    const det = el("details"), ul = el("ul", null, "evidence");
-    det.append(el("summary", `See the ${d.days.length} days`, "small"), el("p", `Today's forecast: ${d.query.text}`, "muted small"));
-    d.days.forEach(x => ul.append(el("li", `${x.date}: ${pct(x.late_share)} late or cancelled (${x.n_late} of ${x.n_dep}), similarity ${x.similarity.toFixed(3)}. ${x.text}`)));
-    det.append(ul); out.push(det);
-    out.push(sources("Sources", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}.`,
-      `Mean similarity ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
+    const ul = el("ul", null, "evidence");
+    d.days.forEach(x => ul.append(el("li", `${x.date}: ${pct(x.late_share)} late or cancelled (${x.n_late} of ${x.n_dep} departures). ${x.text}`)));
+    out.push(fold(`See the ${d.days.length} days`, `Today's forecast: ${d.query.text}`, ul));
+    out.push(fold("How to read this", "murphy looks for earlier days when the airport's weather forecast read most like today's, then counts how those days went. It describes the airport, not your flight."));
+    out.push(fold("Technical details", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}.`,
+      `Similarity of each day: ${d.days.map(x => `${x.date} ${x.similarity.toFixed(3)}`).join(", ")}. Mean ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
   }
   if (tab === "pastdays") box.replaceChildren(...out);
 }
@@ -259,11 +258,12 @@ async function quote(key, box) {
   d.passages.forEach(x => {
     const li = el("li"), a = el("a", `${x.section} (part ${x.part})`);
     a.href = x.url; a.target = "_blank"; a.rel = "noopener";
-    li.append(a, el("blockquote", x.text), el("span", `${x.id} · collected ${x.collected} · hash ${x.sha256} · similarity ${x.score.toFixed(3)}`, "muted small"));
+    li.append(a, el("blockquote", x.text), fold("Source details", `${x.id} · collected ${x.collected} · hash ${x.sha256} · similarity ${x.score.toFixed(3)}`));
     ul.append(li);
   });
   out.push(ul);
-  out.push(sources("How these were found", `Searched: "${d.answer.question}". ${d.provenance.method}.`, `${d.uncertainty.retrieval} ${d.uncertainty.terms} Decision record ${d.provenance.decisions.join(", ")}.`));
+  out.push(fold("How to read this", "These are the passages from your airline's contract and the federal rules that match the situation, quoted as written. The airline's current terms may differ."));
+  out.push(fold("Technical details", `Searched: "${d.answer.question}". ${d.provenance.method}.`, `${d.uncertainty.retrieval} ${d.uncertainty.terms} Decision record ${d.provenance.decisions.join(", ")}.`));
   box.replaceChildren(...out);
 }
 
@@ -273,8 +273,8 @@ const EV_TITLES = { flight: "Your flight", alternatives: "Alternatives", why: "W
 const EV_LABELS = { flight: "Flight", marketed_by: "Sold by", operated_by: "Flown by", origin: "From", dest: "To",
   dep_local: "Departs (local)", arr_local: "Arrives (local)", forecasts: "Forecasts", alternative: "Alternative", carrier: "Airline",
   arr_ahead_min: "Arrives earlier (min)", alt_p_miss: "Its chance of missing", trip_p_miss: "Yours", as_of: "Forecast made (UTC)",
-  community: "Region", community_busiest: "Region's busiest", airport: "Airport", co_disruption_weight: "Link to origin (2023-24)",
-  gcn_late_share_next3h: "Predicted late, next 3 h", metar_id: "Report", metar_known_at: "Known (UTC)", metar: "Report as written",
+  community: "Region", community_busiest: "Region's busiest", airport: "Airport", co_disruption_weight: "Link strength",
+  gcn_late_share_next3h: "Expected late, next 3 h", metar_id: "Report", metar_known_at: "Known (UTC)", metar: "Report as written",
   temp_f: "Temp (°F)", wind_kt: "Wind (kt)", gust_kt: "Gusts (kt)", visibility_mi: "Visibility (mi)", weather_codes: "Weather codes",
   taf_id: "Forecast id", known_at: "Known (UTC)", raw: "Forecast as written", busiest: "Busiest airports", flights: "Flights",
   mean_p_miss: "Average chance of missing", flights_p_miss_50: "Flights at 50% or more" };
@@ -343,7 +343,7 @@ async function ask(key, text) {
   if (d.evidence.length) {
     const det = el("details");
     det.append(el("summary", `Evidence (${d.evidence.length} rows)`, "small"), ...evidenceTables(d.evidence, d.glossary || {}));
-    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""} Decision records: ${d.provenance.decisions.join(", ")}.`, "muted small"));
+    det.append(fold("Technical details", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""} Decision records: ${d.provenance.decisions.join(", ")}.`));
     out.push(det);
   }
   box.replaceChildren(...out);

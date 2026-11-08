@@ -18,7 +18,7 @@ async function map(box) {
   if (mapView.hour == null || mapView.hour > last) mapView.hour = last;
 
   const toggles = el("div", null, "controls map-toggles");
-  [["regions", "Regions"], ["links", "Linked airports"], ["weather", "Weather"]].forEach(([k, label]) => {
+  [["regions", "Delay risk by area"], ["links", "Linked airports"], ["weather", "Weather"]].forEach(([k, label]) => {
     const l = el("label", null, "chip"), c = el("input"); c.type = "checkbox"; c.checked = mapView[k];
     c.onchange = () => { mapView[k] = c.checked; draw(); renderWeather(); };
     l.append(c, " " + label); toggles.append(l);
@@ -78,7 +78,7 @@ async function map(box) {
 
   function draw() {
     const h = mapView.hour;
-    hourLabel.textContent = `${d.hours_utc[h].slice(0, 16)} UTC` + (h === last ? " (the forecast hour)" : ` (${last - h} h before the forecast hour)`);
+    hourLabel.textContent = `${d.hours_local[h]} at ${trip.flight.origin}` + (h === last ? ", the hour your forecast was made" : `, ${last - h} h earlier`);
 
     gDots.selectAll("circle").data(placed, a => a.airport).join("circle")
       .attr("cx", a => xy(a)[0]).attr("cy", a => xy(a)[1]).attr("r", a => (a.big ? 4 : 2.5) / Math.sqrt(k))
@@ -86,8 +86,8 @@ async function map(box) {
       .attr("stroke", css("--surface")).attr("stroke-width", .6 / k)
       .selectAll("title").data(a => [a]).join("title")
       .text(a => { const g = at(d.gcn[a.airport], h), r = at(region[a.community]?.risk, h);
-        return `${a.airport} ${a.name}\nRegion ${a.community}: ${r == null ? "no score" : pct(r)} predicted late, next 3 h` +
-               (g == null ? "\nNot a big airport: no own score" : `\nThis airport: ${pct(g)} predicted late, next 3 h`); });
+        return `${a.airport} ${a.name}\n${region[a.community]?.name}: ${r == null ? "no estimate" : pct(r)} of departures expected late, next 3 h` +
+               (g == null ? "" : `\nThis airport: ${pct(g)} expected late, next 3 h`); });
 
     const top = new Set(d.links.top_by_gcn[h] || []), op = xy(o);
     const nb = mapView.links && op ? d.links.neighbors.filter(n => byCode[n.airport]) : [];
@@ -117,79 +117,86 @@ async function map(box) {
   function renderSide(h) {
     const out = [];
     if (mapView.regions) {
-      out.push(el("h3", "Regions"), el("p", "Predicted late share of departures in the next 3 hours, averaged over each region's big airports.", "muted small"));
-      const t = el("table"), hr = el("tr"); ["Region", "Predicted", "Airports scored"].forEach(x => hr.append(el("th", x))); t.append(hr);
+      out.push(el("h3", "Delay risk by area"),
+        el("p", "Share of departures expected to leave late in the next 3 hours. Darker means more delays.", "muted small"));
+      const t = el("table"), hr = el("tr"); ["Area", "Expected late"].forEach(x => hr.append(el("th", x))); t.append(hr);
       [...d.regions].sort((a, b) => (at(b.risk, h) ?? -1) - (at(a.risk, h) ?? -1)).forEach(r => {
         const tr = el("tr"), sw = el("span", null, "swatch"), v = at(r.risk, h);
         sw.style.background = v == null ? css("--line") : color(v);
-        const c0 = el("td"); c0.append(sw, ` ${r.community}`);
-        tr.append(c0, el("td", v == null ? "no score" : pct(v)), el("td", `${r.airports_scored} of ${r.airports}`)); t.append(tr);
+        const c0 = el("td"); c0.append(sw, ` ${r.name}`);
+        tr.append(c0, el("td", v == null ? "no estimate" : pct(v))); t.append(tr);
       });
-      out.push(t);
+      out.push(t, fold("How to read this",
+        "An area is a group of airports whose delays have tended to happen at the same time (2023–24), so it is not always a neat patch of the map. Each area is named after its busiest airports.",
+        "Every dot is an airport, colored by its area. The slider shows the day leading up to your forecast, never later."),
+        fold("Technical details", `Areas are co-disruption communities (0017). Each value averages a GCN's predicted late share over the area's big airports: ${d.regions.map(r => `${r.name} ${r.airports_scored} of ${r.airports}`).join("; ")}.`));
     }
     if (mapView.links) {
-      out.push(el("h3", `Linked to ${trip.flight.origin}`));
+      out.push(el("h3", `Airports linked to ${trip.flight.origin}`));
       if (d.links.limited) out.push(el("p", d.links.reason, "muted small"));
       else {
-        out.push(el("p", `Likely to go bad next (GCN, top 3): ${(d.links.top_by_gcn[h] || []).join(", ") || "none scored"}.`, "small"));
-        out.push(el("p", `Strongest links, the simpler order: ${d.links.top_by_weight.join(", ")}. ${d.uncertainty.gcn_order}`, "muted small"));
+        const top = d.links.top_by_gcn[h] || [], gcn = Object.fromEntries(d.links.neighbors.map(n => [n.airport, at(n.gcn, h)]));
+        out.push(el("p", `Airports whose delays tend to spread to and from ${trip.flight.origin}. A thicker line means they have had delays at the same time more often.`, "muted small"));
+        out.push(el("p", top.length ? `Most likely to have delays next: ${top.map(a => `${a} (${gcn[a] == null ? "no estimate" : pct(gcn[a]) + " expected late"})`).join(", ")}.` : "No estimate for this hour.", "small"));
+        out.push(fold("Why these three?", d.uncertainty.why_these),
+          fold("Technical details", `Top 3 by GCN at this hour: ${top.join(", ")}. Top 3 by link weight, the simpler baseline: ${d.links.top_by_weight.join(", ")}. ${d.uncertainty.gcn_order}`,
+            `Link weights (2023–24): ${d.links.neighbors.slice(0, 8).map(n => `${n.airport} ${n.weight.toFixed(2)}`).join(", ")}${d.links.neighbors.length > 8 ? "…" : ""}.`));
       }
     }
     side.replaceChildren(...out);
   }
 
-  // Weather in plain words (murphy/wxtext.py), the original reports one click away.
+  // Weather in plain words (murphy/wxtext.py): one line per airport, the rest folded.
   function renderWeather() {
     if (!mapView.weather) { wxBox.replaceChildren(); return; }
     const cols = el("div", null, "wx-grid");
     [[d.weather.origin, "departure"], [d.weather.dest, "arrival"]].forEach(([w, role]) => {
       const c = el("div", null, "wx-card");
-      c.append(el("h3", `${w.airport} · at your ${role}`));
+      c.append(el("h3", `${w.airport}, at your ${role}${w.flight_time ? ` (${w.flight_time})` : ""}`));
       if (w.limited) { c.append(el("p", w.reason, "muted small")); cols.append(c); return; }
       const f = w.notable_at_flight;
-      c.append(el("p", f == null ? `The latest forecast does not reach your ${role} (${w.flight_time}).`
-        : f.length ? `Watch for, around ${w.flight_time}: ${f.join(", ")}.` : `Nothing notable forecast around ${w.flight_time}.`,
-        f && f.length ? "wx-flag" : "muted small"));
-      if (w.metar) { const p = el("p", null, "small"); p.append(el("span", `Now (${w.metar.plain.when.replace("Observed ", "observed ")}): `, "strong"), w.metar.plain.text); c.append(p); }
-      else c.append(el("p", "No observation in the 3 hours before the forecast.", "muted small"));
+      c.append(el("p", f == null ? "The latest forecast doesn't reach that time yet."
+        : f.length ? `Expected around then: ${f.join(", ")}.` : "Nothing notable expected around then.",
+        f && f.length ? "wx-flag" : "small"));
+      if (w.metar) { const p = el("p", null, "small"); p.append(el("span", `Right now (${w.metar.plain.when.replace("Observed ", "")}): `, "strong"), w.metar.plain.short); c.append(p); }
+      else c.append(el("p", "No recent weather report.", "muted small"));
       if (w.taf) {
-        c.append(el("p", `Forecast issued ${w.taf.issued_local}. Highlighted: around your ${role}.`, "muted small"));
         const ul = el("ul", null, "wx-list");
         w.taf.plain.forEach(x => { const li = el("li", null, x.near ? "near" : ""); li.append(el("span", x.when + ": ", "strong"), x.text); ul.append(li); });
-        c.append(ul);
-      } else c.append(el("p", "No forecast (TAF) issued in the data window.", "muted small"));
-      c.append(sources("The original reports", ...(w.metar ? [`METAR, known ${w.metar.known_at} UTC: ${w.metar.text}`] : []),
-        ...(w.taf ? [`TAF, issued ${w.taf.issued_utc} UTC: ${w.taf.lines.join(" · ")}`] : []), w.source));
+        c.append(fold("Full forecast, hour by hour",
+          `Each row is a time window from the airport's official forecast, issued ${w.taf.issued_local}. The highlighted row covers your flight.`, ul));
+      }
+      c.append(fold("Technical details", ...(w.metar ? [`Observation (METAR), known ${w.metar.known_at} UTC: ${w.metar.text}`, `In full: ${w.metar.plain.text}`] : []),
+        ...(w.taf ? [`Forecast (TAF), issued ${w.taf.issued_utc} UTC: ${w.taf.lines.join(" · ")}`] : []),
+        `"Expected around then" covers forecast windows within an hour of your flight and uses murphy's simple thresholds, not an aviation rule: ${w.thresholds}.`, w.source));
       cols.append(c);
     });
-    const thr = [d.weather.origin, d.weather.dest].find(w => w.thresholds)?.thresholds;
-    wxBox.replaceChildren(el("h3", "Weather, as known at forecast time"), cols,
-      ...(thr ? [el("p", `"Watch for" uses murphy's simple thresholds, not an aviation rule: ${thr}. Times are local to each airport.`, "muted small")] : []));
+    wxBox.replaceChildren(el("h3", "Weather"), cols);
   }
 
-  renderTimeline(timeline);
+  renderTimeline(timeline, d.route.origin?.tz);
   renderWeather();
-  const lim = [...d.uncertainty.limits]; if (offMap) lim.push(`${offMap} airports fall outside the map's projection and are not drawn.`);
+  const lim = [...d.uncertainty.limits]; if (offMap) lim.push(`Airports outside the map's projection, not drawn: ${offMap}.`);
   const p = d.provenance;
-  notes.replaceChildren(sources("Where the map's numbers came from", `GCN: ${p.gcn}. Regions: ${p.regions}. Links: ${p.links}.`,
-    `Forecast as of ${p.forecast_as_of_utc} UTC; the slider's last hour is ${p.forecast_hour_utc} UTC. Decision record ${p.decisions.join(", ")}.`,
-    ...lim));
+  notes.replaceChildren(fold("How to read this map", "The line is your route, colored by murphy's advice. Dots are airports. Use the switches to show or hide each layer, and the slider to see the day leading up to your forecast.", ...lim),
+    fold("Technical details", `GCN: ${p.gcn}. Areas: ${p.regions}. Links: ${p.links}.`,
+      `Forecast as of ${p.forecast_as_of_utc} UTC; the slider's last hour is ${p.forecast_hour_utc} UTC. Decision record ${p.decisions.join(", ")}.`));
   if (mapView.zoom) svg.call(zoom.transform, mapView.zoom); else draw();
 }
 
 // --- Alternatives as a timeline beside the route (0025): same route, so a bar per flight in time.
-function renderTimeline(box) {
+function renderTimeline(box, tz) {
   const f = trip.flight, rows = [{ ...f, original: true }, ...trip.alternatives.filter(a => a.schedule_ok)];
   const bad = trip.alternatives.length - rows.length + 1;
   const out = [el("h3", "Your flight and the alternatives, by scheduled time")];
   if (rows.length === 1) out.push(el("p", trip.answer.verdict === "keep" ? "No change suggested, so no alternatives are listed." : "No alternative within your limits.", "muted small"));
   const t = s => new Date(s.replace(" ", "T") + "Z");
   const deadline = new Date(+t(f.arrives_utc) + 60000 * +$("deadline").value);
-  const W = 900, rowH = 22, top = 24, H = top + rowH * rows.length + 8, left = 110, right = 20;
+  const W = 900, rowH = 22, top = 24, H = top + rowH * rows.length + 8, left = 110, right = 40;
   const x = d3.scaleUtc().domain([d3.min(rows, r => t(r.departs_utc)), d3.max([deadline, ...rows.map(r => t(r.arrives_utc))])]).nice()
     .range([left, W - right]);
   const svg = d3.create("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("class", "timeline");
-  svg.append("g").attr("transform", `translate(0,${top - 4})`).call(d3.axisTop(x).ticks(8).tickFormat(d3.utcFormat("%H:%M"))).attr("class", "axis");
+  svg.append("g").attr("transform", `translate(0,${top - 4})`).call(d3.axisTop(x).ticks(8).tickFormat(tz ? (v => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(v).toLowerCase()) : d3.utcFormat("%H:%M"))).attr("class", "axis");
   svg.append("line").attr("x1", x(deadline)).attr("x2", x(deadline)).attr("y1", top - 4).attr("y2", H).attr("class", "deadline");
   const nearEnd = x(deadline) > W - right - 90;  // keep the label inside the box
   svg.append("text").attr("x", x(deadline) + (nearEnd ? -4 : 4)).attr("y", H - 4).attr("text-anchor", nearEnd ? "end" : "start")
@@ -205,7 +212,7 @@ function renderTimeline(box) {
       ? `${r.flight}, yours: departs ${time(r.departs_local)}, arrives ${time(r.arrives_local)} local. Chance of making your deadline ${pct(trip.answer.chance)}.`
       : `${r.flight} on ${r.date}: departs ${time(r.departs_local)}, arrives ${time(r.arrives_local)} local. Chance ${pct(r.chance)} (${r.gain >= 0 ? "+" : ""}${(100 * r.gain).toFixed(0)} pts vs yours)${r.best ? ", the best option" : ""}.`);
   });
-  out.push(svg.node(), detail, el("p", "Times on the axis are UTC. Green: better chance than yours (dark: the best). Grey: not better." +
+  out.push(svg.node(), detail, el("p", (tz ? `Times are local at ${f.origin}.` : "Times are UTC.") + " Green: a better chance than yours (darkest: the best). Grey: not better." +
     (bad ? ` ${bad} alternative${bad > 1 ? "s are" : " is"} not drawn: the source schedule arrives before it leaves.` : ""), "muted small"));
   box.replaceChildren(...out);
 }
