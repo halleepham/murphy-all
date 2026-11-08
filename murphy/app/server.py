@@ -37,14 +37,14 @@ LIMITS = [
 def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: float, sort: str = "chance") -> dict | None:
     cols = ", ".join(PCOLS)
     t = con.execute(f"SELECT flight_id, lead_h, flight_date, as_of_utc, carrier, flight_number, origin, dest, crs_dep_local, "
-                    f"crs_arr_local, known_cancelled, {cols} FROM trips WHERE flight_id = ? AND lead_h = ?",
+                    f"crs_arr_local, sched_dep_utc, sched_arr_utc, known_cancelled, {cols} FROM trips WHERE flight_id = ? AND lead_h = ?",
                     [flight_id, lead_h]).df()
     if t.empty:
         return None
     t = t.iloc[0]
     probs = t[PCOLS].fillna(0).to_numpy(dtype=float)
     current = float(p_make(probs[None], [deadline_min])[0])
-    a = con.execute(f"SELECT alt, alt_lead, arr_ahead_min, carrier, flight_number, flight_date, crs_dep_local, crs_arr_local, {cols} "
+    a = con.execute(f"SELECT alt, alt_lead, arr_ahead_min, carrier, flight_number, flight_date, crs_dep_local, crs_arr_local, sched_dep_utc, sched_arr_utc, {cols} "
                     "FROM alts WHERE flight_id = ? AND lead_h = ? AND arr_ahead_min + ? >= 0 AND alt_lead - lead_h >= ?",
                     [flight_id, lead_h, deadline_min, -max_earlier_h]).df()
     fares = con.execute("SELECT * FROM fares WHERE origin = ? AND dest = ?", [t.origin, t.dest]).df()
@@ -55,6 +55,8 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
         for i, (_, r) in enumerate(a.iterrows()):
             alts.append({"flight": f"{r.carrier} {r.flight_number}", "flight_id": r.alt, "date": str(r.flight_date)[:10],
                          "departs_local": r.crs_dep_local, "arrives_local": r.crs_arr_local,
+                         "departs_utc": str(r.sched_dep_utc), "arrives_utc": str(r.sched_arr_utc),  # scheduled, known in advance
+                         "schedule_ok": bool(r.sched_arr_utc > r.sched_dep_utc),  # 2 BTS rows arrive before they leave
                          "chance": float(r.chance), "gain": float(r.chance - current), "best": i == 0 and r.chance > current,  # never mark a worse flight as best
                          "same_airline": r.carrier == t.carrier,
                          "cost": estimated_fare(fares, t.origin, t.dest, r.carrier)})
@@ -78,7 +80,8 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
                         [deadline_min, band]).df().iloc[0]
     return {"answer": {"verdict": v, "chance": current, "miss": 1 - current},
             "flight": {"flight": f"{t.carrier} {t.flight_number}", "flight_id": t.flight_id, "date": str(t.flight_date)[:10],
-                       "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local},
+                       "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local,
+                       "departs_utc": str(t.sched_dep_utc), "arrives_utc": str(t.sched_arr_utc)},
             "alternatives": alts,
             "curve": curve,
             "askable": GRAPH_WINDOW[0] <= str(t.flight_date)[:10] <= GRAPH_WINDOW[1],

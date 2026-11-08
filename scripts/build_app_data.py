@@ -51,13 +51,13 @@ def main() -> None:
     con = duckdb.connect(str(OUT))
     con.execute(f"""CREATE TABLE trips AS
         SELECT c.flight_id, c.lead_h, c.flight_date, c.as_of_utc, f.marketing_carrier AS carrier, f.flight_number,
-               c.origin, c.dest, f.crs_dep_local, f.crs_arr_local,
+               c.origin, c.dest, f.crs_dep_local, f.crs_arr_local, f.sched_dep_utc, f.sched_arr_utc,
                coalesce(f.cancelled AND f.dep_known_at < c.as_of_utc, false) AS known_cancelled, {cols}
         FROM read_parquet('{R}/current.parquet') c JOIN read_parquet('{F2025}') f USING (flight_id)
         ORDER BY c.flight_date, f.marketing_carrier, f.flight_number""")
     con.execute(f"""CREATE TABLE alts AS
         SELECT p.flight_id, p.lead_h, p.alt, p.alt_lead, p.arr_ahead_min, f.marketing_carrier AS carrier, f.flight_number,
-               f.flight_date, f.crs_dep_local, f.crs_arr_local, {alt_cols}
+               f.flight_date, f.crs_dep_local, f.crs_arr_local, f.sched_dep_utc, f.sched_arr_utc, {alt_cols}
         FROM read_parquet('{R}/pairs.parquet') p
         JOIN read_parquet('{R}/alt_forecasts.parquet') a ON a.alt = p.alt AND a.alt_lead = p.alt_lead
         JOIN read_parquet('{F2025}') f ON f.flight_id = p.alt

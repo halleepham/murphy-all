@@ -105,3 +105,35 @@ blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--lin
 @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .assistant { position: static; max-height: none; } }
 .prose { max-width: 42em; }
 .prose h2 { margin: 28px 0 8px; font-size: 1.2rem; }
+
+/* Map tab (0025) */
+.map-toggles .chip { display: inline-flex; align-items: center; gap: 4px; }
+.map-slider { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.map-slider input[type=range] { flex: 1; min-width: 200px; }
+.map-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.map-grid svg { width: 100%; height: auto; display: block; }
+.map-side h3 { font-size: .95rem; margin: 12px 0 4px; }
+.map-side h3:first-child { margin-top: 0; }
+.map-side p { margin: 4px 0; }
+.map-side td, .map-side th { padding: 5px 6px; }
+.nation { fill: var(--bg); stroke: var(--muted); stroke-width: .8; }
+.state-lines { fill: none; stroke: var(--line); stroke-width: .7; }
+.route { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+.end { stroke: var(--surface); stroke-width: 2; }
+.end-label { font: 700 14px var(--font); fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.link { stroke: var(--muted); stroke-opacity: .35; }
+.link.top { stroke: var(--accent); stroke-opacity: .9; }
+.link-label { font: 600 12px var(--font); fill: var(--accent); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; }
+pre.wx { font-size: .75rem; white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 4px 0; }
+.strong { font-weight: 700; }
+.timeline { width: 100%; height: auto; display: block; }
+.timeline .axis text, .small-label { font: 12px var(--font); fill: var(--muted); }
+.timeline .axis path, .timeline .axis line { stroke: var(--line); }
+.deadline { stroke: var(--text); stroke-dasharray: 4 4; }
+.bar.mine { fill: var(--accent); }
+.bar.best { fill: var(--good); }
+.bar.better { fill: var(--good); fill-opacity: .45; }
+.bar.worse { fill: var(--muted); fill-opacity: .4; }
+.bar-row:hover .bar { stroke: var(--text); }
+@media (max-width: 760px) { .map-grid { grid-template-columns: 1fr; } }

@@ -14,12 +14,14 @@ def probs(make):
 def trip(fid, make, cancelled=False):
     return {"flight_id": fid, "lead_h": 2, "flight_date": "2025-03-01", "as_of_utc": "2025-03-01 10:00:00", "carrier": "DL",
             "flight_number": 1, "origin": "LGA", "dest": "ORD", "crs_dep_local": "0700", "crs_arr_local": "0900",
+            "sched_dep_utc": pd.Timestamp("2025-03-01 12:00"), "sched_arr_utc": pd.Timestamp("2025-03-01 15:00"),
             "known_cancelled": cancelled, **probs(make)}
 
 
 def alt(fid, aid, make, carrier, earlier_h=0.0):
     return {"flight_id": fid, "lead_h": 2, "alt": aid, "alt_lead": 2 - earlier_h, "arr_ahead_min": 0, "carrier": carrier,
-            "flight_number": 9, "flight_date": "2025-03-01", "crs_dep_local": "0800", "crs_arr_local": "1000", **probs(make)}
+            "flight_number": 9, "flight_date": "2025-03-01", "crs_dep_local": "0800", "crs_arr_local": "1000",
+            "sched_dep_utc": pd.Timestamp("2025-03-01 13:00"), "sched_arr_utc": pd.Timestamp("2025-03-01 16:00"), **probs(make)}
 
 
 @pytest.fixture(scope="module")
@@ -307,3 +309,9 @@ def test_the_curve_shows_the_best_alternative_and_the_typical_flight(client):
 def test_no_best_alternative_curve_when_nothing_is_better(client):  # thin evidence: nothing to compare
     assert get(client, "alone").json()["curve"]["best_alt"] is None
     assert get(client, "low").json()["curve"]["best_alt"] is None
+
+
+def test_scheduled_utc_times_reach_the_timeline(client):
+    d = get(client, "high").json()
+    assert d["flight"]["arrives_utc"] == "2025-03-01 15:00:00"
+    assert all(a["departs_utc"] == "2025-03-01 13:00:00" and a["schedule_ok"] for a in d["alternatives"])

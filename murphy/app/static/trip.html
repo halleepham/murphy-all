@@ -47,7 +47,10 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/static/common.js"></script>
+<script src="/static/map.js"></script>
 <script>
 const WORDS = {
   keep: "Keep your flight", too_uncertain: "Too uncertain to say", consider_changing: "Consider changing",
@@ -67,11 +70,11 @@ const SITUATIONS = [  // murphy.policies.SITUATIONS (0021)
   ["change_myself", "I want to switch flights myself"], ["missed_connection", "I missed my connection"],
   ["tarmac", "Stuck on the plane on the ground"], ["bumped", "Bumped from an oversold flight"],
 ];
-const TABS = [["options", "Options"], ["pastdays", "Similar days"], ["rules", "Rules"]];
+const TABS = [["options", "Options"], ["map", "Map"], ["pastdays", "Similar days"], ["rules", "Rules"]];
 
 const flightId = new URLSearchParams(location.search).get("flight_id");
 const settings = { max_earlier_h: 2, sort: "chance" };
-let trip = null, tab = "options";
+let trip = null, tab = TABS.some(([k]) => "#" + k === location.hash) ? location.hash.slice(1) : "options";  // #map opens a tab directly
 
 const params = extra => new URLSearchParams({ flight_id: flightId, lead_h: $("lead").value, deadline_min: $("deadline").value, ...extra });
 const show = v => Array.isArray(v) ? v.map(x => typeof x === "object" ? JSON.stringify(x) : x).join(", ") : v;
@@ -176,7 +179,7 @@ function renderTabs() {
 function openTab(key) {
   tab = key;
   $("tabs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.key === key));
-  ({ options, pastdays, rules })[key]($("panel"));
+  ({ options, map, pastdays, rules })[key]($("panel"));
 }
 
 // --- Options: alternatives, with the traveler's limits ---------------------------------------
