@@ -128,15 +128,19 @@ def policy_index():
     return index
 
 
-def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=None, policy_ix=None) -> FastAPI:
+def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=None, policy_ix=None, map_inputs=None) -> FastAPI:
     """graph_session: a function returning a Neo4j session (a fake one in tests).
     past_index, taf_as_of: the similar-past-days index and TAF lookup (fakes in tests).
-    policy_ix: the policy-passage index (a fake in tests)."""
+    policy_ix: the policy-passage index (a fake in tests).
+    map_inputs: a function returning the map's files, or None if not built (a fake in tests)."""
     app = FastAPI(title="murphy")
     con = duckdb.connect(str(db), read_only=True)
     graph_session = graph_session or neo4j_sessions()
     past_index = past_index or pastdays_index()
     policy_ix = policy_ix or policy_index()
+    if map_inputs is None:
+        from murphy import mapdata
+        map_inputs = mapdata.inputs
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -225,6 +229,22 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
                 "uncertainty": {"retrieval": "Tested on 16 situation and airline pairs: a correct passage was in the "
                                              "top 3 for 13 (0021 Finding 1).",
                                 "terms": "Quoted from the source as collected; the airline's current terms may differ."}}
+
+    @app.get("/api/map")
+    def map_layers(flight_id: str, lead_h: int = 2):
+        """The map's layers as of the trip's forecast time (0025): route, regions, linked airports, weather."""
+        from murphy import mapdata
+        if lead_h not in LEADS:
+            raise HTTPException(422, f"lead_h must be one of {sorted(LEADS)}")
+        t = con.cursor().execute("SELECT origin, dest, as_of_utc FROM trips WHERE flight_id = ? AND lead_h = ?",
+                                 [flight_id, lead_h]).df()
+        if t.empty:
+            raise HTTPException(404, "No forecast for this flight at this time.")
+        m = map_inputs()
+        if m is None:
+            raise HTTPException(503, "The map's data files are not built on this machine.")
+        t = t.iloc[0]
+        return mapdata.build(t.origin, t.dest, t.as_of_utc, **m)
 
     @app.get("/api/ask")
     def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,

@@ -85,7 +85,12 @@ def gcn_lookup(airport: str, as_of) -> float | None:
         return None
     if hasattr(as_of, "to_native"):  # neo4j DateTime
         as_of = as_of.to_native()
+    h = hour_index(as_of)
+    return float(s[0][h, s[1][airport]]) if 0 <= h < len(s[0]) else None
+
+
+def hour_index(as_of) -> int:
+    """Row of the score arrays for the top of the hour at or before as_of (UTC; naive means UTC)."""
     t = pd.Timestamp(as_of)
     t = (t.tz_convert("UTC").tz_localize(None) if t.tzinfo else t).floor("h")
-    h = int((t - pd.Timestamp(START)) / pd.Timedelta(hours=1))
-    return float(s[0][h, s[1][airport]]) if 0 <= h < len(s[0]) else None
+    return int((t - pd.Timestamp(START)) / pd.Timedelta(hours=1))
