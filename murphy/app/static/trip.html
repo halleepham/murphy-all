@@ -80,7 +80,6 @@ const settings = { max_earlier_h: 2, sort: "chance" };
 let trip = null, tab = TABS.some(([k]) => "#" + k === location.hash) ? location.hash.slice(1) : "options";  // #map opens a tab directly
 
 const params = extra => new URLSearchParams({ flight_id: flightId, lead_h: $("lead").value, deadline_min: $("deadline").value, ...extra });
-const show = v => Array.isArray(v) ? v.map(x => typeof x === "object" ? JSON.stringify(x) : x).join(", ") : v;
 const sources = (summary, ...lines) => { const d = el("details"); d.append(el("summary", summary, "small"), ...lines.map(l => el("p", l, "muted small"))); return d; };
 
 async function load() {
@@ -268,6 +267,56 @@ async function quote(key, box) {
   box.replaceChildren(...out);
 }
 
+// --- Evidence as tables: one per graph query, a column per field, the [E1] tags kept ----------
+const EV_TITLES = { flight: "Your flight", alternatives: "Alternatives", why: "Weather at the origin and linked airports",
+  taf: "Forecast at the origin (TAF)", community_day: "Regions today" };
+const EV_LABELS = { flight: "Flight", marketed_by: "Sold by", operated_by: "Flown by", origin: "From", dest: "To",
+  dep_local: "Departs (local)", arr_local: "Arrives (local)", forecasts: "Forecasts", alternative: "Alternative", carrier: "Airline",
+  arr_ahead_min: "Arrives earlier (min)", alt_p_miss: "Its chance of missing", trip_p_miss: "Yours", as_of: "Forecast made (UTC)",
+  community: "Region", community_busiest: "Region's busiest", airport: "Airport", co_disruption_weight: "Link to origin (2023-24)",
+  gcn_late_share_next3h: "Predicted late, next 3 h", metar_id: "Report", metar_known_at: "Known (UTC)", metar: "Report as written",
+  temp_f: "Temp (°F)", wind_kt: "Wind (kt)", gust_kt: "Gusts (kt)", visibility_mi: "Visibility (mi)", weather_codes: "Weather codes",
+  taf_id: "Forecast id", known_at: "Known (UTC)", raw: "Forecast as written", busiest: "Busiest airports", flights: "Flights",
+  mean_p_miss: "Average chance of missing", flights_p_miss_50: "Flights at 50% or more" };
+const LONG = new Set(["metar", "raw"]);
+// Source ids and times go in a tooltip on the [E] tag: still traceable, out of the way.
+const EV_TRACE = ["metar", "metar_id", "metar_known_at", "taf_id", "known_at"];
+const EV_ORDER = ["airport", "co_disruption_weight", "gcn_late_share_next3h", "temp_f", "wind_kt", "gust_kt", "visibility_mi", "weather_codes"];
+const evRank = k => { const i = EV_ORDER.indexOf(k); return LONG.has(k) ? 99 : i < 0 ? 50 : i; };
+const evLabel = k => EV_LABELS[k] || k.replace(/_/g, " ");
+const evCell = v => v == null || v === "" ? "—" : Array.isArray(v)
+  ? v.map(x => typeof x === "object" ? (x.lead_h != null && x.p_miss != null ? `${x.lead_h} h before: ${x.p_miss}` : Object.entries(x).map(([k, y]) => `${evLabel(k)} ${y}`).join(", ")) : x).join("; ")
+  : String(v);
+
+function evidenceTables(ev, glossary) {
+  const groups = {};
+  ev.forEach(r => (groups[r.query || "evidence"] ||= []).push(r));
+  return Object.entries(groups).map(([q, rows]) => {
+    let cols = [...new Set(rows.flatMap(Object.keys))].filter(k => k !== "tag" && k !== "query" && !EV_TRACE.includes(k) && rows.some(r => r[k] != null && r[k] !== ""));
+    const same = rows.length > 1 ? cols.filter(k => rows.every(r => JSON.stringify(r[k]) === JSON.stringify(rows[0][k]))) : [];
+    cols = cols.filter(k => !same.includes(k)).sort((a, b) => evRank(a) - evRank(b));
+    const tag = r => { const td = el("td", r.tag); const t = EV_TRACE.filter(k => r[k]).map(k => `${evLabel(k)}: ${r[k]}`).join("\n");
+      if (t) { td.title = t; td.className = "traced"; } return td; };
+    const head = k => { const th = el("th", evLabel(k)); if (glossary[k]) th.title = glossary[k]; return th; };
+    const cell = (k, v) => el("td", evCell(v), LONG.has(k) ? "long" : "");
+    const box = el("div", null, "ev-group"), wrap = el("div", null, "scroll");
+    box.append(el("h4", EV_TITLES[q] || q));
+    if (same.length) box.append(el("p", same.map(k => `${evLabel(k)}: ${evCell(rows[0][k])}`).join(" · "), "muted small"));
+    let t;
+    if (rows.length === 1) {  // one row reads better turned on its side
+      t = el("table", null, "ev kv");
+      const tr = el("tr"); tr.append(el("th", "Evidence"), tag(rows[0])); t.append(tr);
+      cols.forEach(k => { const tr = el("tr"); tr.append(head(k), cell(k, rows[0][k])); t.append(tr); });
+    } else {
+      t = el("table", null, "ev");
+      const tr = el("tr"); tr.append(el("th", "Evidence"), ...cols.map(head)); t.append(tr);
+      rows.forEach(r => { const tr = el("tr"); tr.append(tag(r), ...cols.map(k => cell(k, r[k]))); t.append(tr); });
+    }
+    wrap.append(t); box.append(wrap);
+    return box;
+  });
+}
+
 // --- Ask sidebar (0019): GraphRAG, 60-minute deadline only. Stays beside every tab. -----------
 // The conversation is cleared whenever the trip reloads, so an answer never sits beside
 // settings it was not made for.
@@ -292,10 +341,9 @@ async function ask(key, text) {
   if (d.checks && d.checks.invented.length) out.push(el("p", "Check: these numbers are not in the evidence: " + d.checks.invented.join(", "), "error small"));
   if (d.checks && d.checks.bad_tags.length) out.push(el("p", "Check: it cites evidence that does not exist: " + d.checks.bad_tags.join(", "), "error small"));
   if (d.evidence.length) {
-    const det = el("details"), ul = el("ul", null, "evidence");
-    det.append(el("summary", `Evidence (${d.evidence.length} rows)`, "small"));
-    d.evidence.forEach(r => ul.append(el("li", `[${r.tag}] ${r.query}: ` + Object.entries(r).filter(([k]) => k !== "tag" && k !== "query").map(([k, v]) => `${k} ${show(v)}`).join("; "))));
-    det.append(ul, el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""} Decision records: ${d.provenance.decisions.join(", ")}.`, "muted small"));
+    const det = el("details");
+    det.append(el("summary", `Evidence (${d.evidence.length} rows)`, "small"), ...evidenceTables(d.evidence, d.glossary || {}));
+    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""} Decision records: ${d.provenance.decisions.join(", ")}.`, "muted small"));
     out.push(det);
   }
   box.replaceChildren(...out);

@@ -196,6 +196,7 @@ def answer(session, key: str, flight_id: str, lead_h: int, max_earlier_h: float)
         return out
     ev = evidence(session, key, flight_id, lead_h, max_earlier_h=max_earlier_h)
     out["evidence"] = ev
+    out["glossary"] = {k: v for k, v in GLOSSARY.items() if any(k in e for e in ev)}  # for the evidence table headers
     if not ev:  # nothing to explain: code says so, no LLM call
         out["status"] = "no_evidence"
         return out

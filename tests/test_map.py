@@ -26,7 +26,7 @@ PLACES = pd.DataFrame({"airport": ["AAA", "BBB", "CCC", "DDD", "SSS", "NOC"], "c
 LINKS = pd.DataFrame({"a": ["AAA", "AAA", "CCC"], "b": ["BBB", "DDD", "AAA"], "weight": [0.9, 0.6, 0.3], "years": "2023-24"})
 
 
-def wx(airport, as_of):
+def wx(airport, as_of, around=None):
     return {"airport": airport, "limited": airport != "AAA"}
 
 
@@ -89,7 +89,8 @@ def client(tmp_path_factory):
     path = tmp_path_factory.mktemp("map") / "t.duckdb"
     con = duckdb.connect(str(path))
     trips = pd.DataFrame({"flight_id": ["f1"], "lead_h": [2], "origin": ["AAA"], "dest": ["SSS"],
-                          "as_of_utc": [pd.Timestamp(AS_OF)]})
+                          "as_of_utc": [pd.Timestamp(AS_OF)],
+                          "sched_dep_utc": [pd.Timestamp("2023-01-02 07:30")], "sched_arr_utc": [pd.Timestamp("2023-01-02 10:30")]})
     con.execute("CREATE TABLE trips AS SELECT * FROM trips")
     con.close()
     m = {"scores": scores(), "big": BIG, "places": PLACES, "links": LINKS, "weather": wx}

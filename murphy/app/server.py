@@ -239,7 +239,7 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
         from murphy import mapdata
         if lead_h not in LEADS:
             raise HTTPException(422, f"lead_h must be one of {sorted(LEADS)}")
-        t = con.cursor().execute("SELECT origin, dest, as_of_utc FROM trips WHERE flight_id = ? AND lead_h = ?",
+        t = con.cursor().execute("SELECT origin, dest, as_of_utc, sched_dep_utc, sched_arr_utc FROM trips WHERE flight_id = ? AND lead_h = ?",
                                  [flight_id, lead_h]).df()
         if t.empty:
             raise HTTPException(404, "No forecast for this flight at this time.")
@@ -247,7 +247,7 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
         if m is None:
             raise HTTPException(503, "The map's data files are not built on this machine.")
         t = t.iloc[0]
-        return mapdata.build(t.origin, t.dest, t.as_of_utc, **m)
+        return mapdata.build(t.origin, t.dest, t.as_of_utc, **m, dep_utc=t.sched_dep_utc, arr_utc=t.sched_arr_utc)
 
     @app.get("/api/ask")
     def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,

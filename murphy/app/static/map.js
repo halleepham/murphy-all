@@ -4,7 +4,7 @@
 
 const US = fetch("https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json").then(r => r.json());
 const mapCache = {};  // by lead time: the layers do not depend on the deadline
-const mapView = { regions: true, links: true, weather: true, hour: null, playing: null };
+const mapView = { regions: true, links: true, weather: true, hour: null, playing: null, zoom: null };
 const VERDICT_COLOR = { keep: "--good", too_uncertain: "--warn" };  // anything else is --bad
 
 async function map(box) {
@@ -20,7 +20,7 @@ async function map(box) {
   const toggles = el("div", null, "controls map-toggles");
   [["regions", "Regions"], ["links", "Linked airports"], ["weather", "Weather"]].forEach(([k, label]) => {
     const l = el("label", null, "chip"), c = el("input"); c.type = "checkbox"; c.checked = mapView[k];
-    c.onchange = () => { mapView[k] = c.checked; draw(); };
+    c.onchange = () => { mapView[k] = c.checked; draw(); renderWeather(); };
     l.append(c, " " + label); toggles.append(l);
   });
   const slider = el("input"); Object.assign(slider, { type: "range", min: 0, max: last, step: 1, value: mapView.hour });
@@ -36,57 +36,80 @@ async function map(box) {
       mapView.hour++; slider.value = mapView.hour; draw();
     }, 500);
   };
-  const time_row = el("div", null, "map-slider"); time_row.append(play, slider, hourLabel);
+  const timeRow = el("div", null, "map-slider"); timeRow.append(play, slider, hourLabel);
 
   const svgBox = el("div", null, "map-box"), side = el("div", null, "map-side");
   const grid = el("div", null, "map-grid"); grid.append(svgBox, side);
-  const timeline = el("div"), notes = el("div");
-  box.replaceChildren(toggles, time_row, grid, timeline, notes);
+  const wxBox = el("div"), timeline = el("div"), notes = el("div");
+  box.replaceChildren(toggles, timeRow, grid, wxBox, timeline, notes);
 
-  // --- base map, drawn once per open -----------------------------------------------------------
+  // --- base map --------------------------------------------------------------------------------
   const W = 900, H = 540, proj = d3.geoAlbersUsa().scale(1150).translate([W / 2, H / 2]), path = d3.geoPath(proj);
   const svg = d3.select(svgBox).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
     .attr("aria-label", `Map of ${trip.flight.origin} to ${trip.flight.dest} with regions and linked airports`);
-  svg.append("path").datum(topojson.mesh(us, us.objects.states, (a, b) => a !== b)).attr("class", "state-lines").attr("d", path);
-  svg.append("path").datum(topojson.feature(us, us.objects.nation)).attr("class", "nation").attr("d", path);
+  const world = svg.append("g");  // everything that zooms
+  world.append("path").datum(topojson.feature(us, us.objects.nation)).attr("class", "nation").attr("d", path);
+  world.append("path").datum(topojson.mesh(us, us.objects.states, (a, b) => a !== b)).attr("class", "state-lines").attr("d", path);
   const xy = a => a && proj([a.lon, a.lat]);
   const placed = d.airports.filter(a => xy(a)), offMap = d.airports.length - placed.length;
-  const gLinks = svg.append("g"), gDots = svg.append("g"), gRoute = svg.append("g"), gLabels = svg.append("g");
+  const byCode = Object.fromEntries(placed.map(a => [a.airport, a]));
+  const gLinks = world.append("g"), gDots = world.append("g"), gRoute = world.append("g"), gLabels = world.append("g");
+
+  // Zoom: buttons, pinch, or Ctrl/Cmd + scroll (plain scrolling still scrolls the page). Drag to pan.
+  let k = mapView.zoom ? mapView.zoom.k : 1;
+  const zoom = d3.zoom().scaleExtent([1, 12]).translateExtent([[0, 0], [W, H]])
+    .filter(e => (e.type !== "wheel" || e.ctrlKey || e.metaKey) && !e.button)
+    .on("zoom", e => { world.attr("transform", e.transform); k = e.transform.k; mapView.zoom = e.transform; draw(); });
+  svg.call(zoom);
+  const zoomBar = el("div", null, "zoom-bar");
+  [["+", "Zoom in", () => svg.call(zoom.scaleBy, 2)],
+   ["−", "Zoom out", () => svg.call(zoom.scaleBy, 0.5)],
+   ["Reset", "Show the whole map", () => svg.call(zoom.transform, d3.zoomIdentity)]].forEach(([t, label, f]) => {
+    const b = el("button", t, "btn small"); b.type = "button"; b.title = label; b.setAttribute("aria-label", label); b.onclick = f; zoomBar.append(b);
+  });
+  svgBox.append(zoomBar, el("p", "Zoom with the buttons, a pinch, or Ctrl/⌘ + scroll. Drag to move around.", "muted small"));
 
   const risks = d.regions.flatMap(r => r.risk).filter(v => v != null);
   const color = d3.scaleSequential(d3.interpolateOrRd).domain([0, d3.max(risks) || 1]);
   const region = Object.fromEntries(d.regions.map(r => [r.community, r]));
   const at = (arr, h) => arr ? arr[h] : null;
-
   const o = d.route.origin, dst = d.route.dest, vcol = css(VERDICT_COLOR[trip.answer.verdict] || "--bad");
-  if (xy(o) && xy(dst)) gRoute.append("path").datum({ type: "LineString", coordinates: [[o.lon, o.lat], [dst.lon, dst.lat]] })
-    .attr("d", path).attr("class", "route").attr("stroke", vcol);
-  [o, dst].forEach(a => { const p = xy(a); if (!p) return;
-    gRoute.append("circle").attr("cx", p[0]).attr("cy", p[1]).attr("r", 7).attr("fill", vcol).attr("class", "end");
-    gRoute.append("text").attr("x", p[0] + 10).attr("y", p[1] - 8).attr("class", "end-label").text(a.airport); });
+  const ends = [o, dst].filter(a => xy(a)), wxAt = new Set([d.weather.origin, d.weather.dest].filter(w => !w.limited).map(w => w.airport));
 
   function draw() {
     const h = mapView.hour;
     hourLabel.textContent = `${d.hours_utc[h].slice(0, 16)} UTC` + (h === last ? " (the forecast hour)" : ` (${last - h} h before the forecast hour)`);
 
     gDots.selectAll("circle").data(placed, a => a.airport).join("circle")
-      .attr("cx", a => xy(a)[0]).attr("cy", a => xy(a)[1]).attr("r", a => a.big ? 4 : 2.5)
+      .attr("cx", a => xy(a)[0]).attr("cy", a => xy(a)[1]).attr("r", a => (a.big ? 4 : 2.5) / Math.sqrt(k))
       .attr("fill", a => { const v = at(region[a.community]?.risk, h); return mapView.regions && v != null ? color(v) : css("--line"); })
-      .attr("stroke", css("--surface")).attr("stroke-width", .6)
+      .attr("stroke", css("--surface")).attr("stroke-width", .6 / k)
       .selectAll("title").data(a => [a]).join("title")
       .text(a => { const g = at(d.gcn[a.airport], h), r = at(region[a.community]?.risk, h);
         return `${a.airport} ${a.name}\nRegion ${a.community}: ${r == null ? "no score" : pct(r)} predicted late, next 3 h` +
                (g == null ? "\nNot a big airport: no own score" : `\nThis airport: ${pct(g)} predicted late, next 3 h`); });
 
-    const lk = d.links, top = new Set(lk.top_by_gcn[h] || []), op = xy(o);
-    const nb = mapView.links && op ? lk.neighbors.filter(n => xy(d.airports.find(a => a.airport === n.airport))) : [];
-    const pos = n => xy(d.airports.find(a => a.airport === n.airport));
+    const top = new Set(d.links.top_by_gcn[h] || []), op = xy(o);
+    const nb = mapView.links && op ? d.links.neighbors.filter(n => byCode[n.airport]) : [];
+    const pos = n => xy(byCode[n.airport]);
     gLinks.selectAll("line").data(nb, n => n.airport).join("line")
       .attr("x1", op?.[0]).attr("y1", op?.[1]).attr("x2", n => pos(n)[0]).attr("y2", n => pos(n)[1])
-      .attr("class", n => top.has(n.airport) ? "link top" : "link").attr("stroke-width", n => 0.5 + 2 * n.weight);
+      .attr("class", n => top.has(n.airport) ? "link top" : "link").attr("stroke-width", n => (0.5 + 2 * n.weight) / k);
     gLabels.selectAll("text").data(nb.filter(n => top.has(n.airport)), n => n.airport).join("text")
-      .attr("x", n => pos(n)[0] + 6).attr("y", n => pos(n)[1] + 4).attr("class", "link-label")
+      .attr("x", n => pos(n)[0] + 6 / k).attr("y", n => pos(n)[1] + 4 / k).attr("class", "link-label")
+      .style("font-size", `${12 / k}px`).style("stroke-width", `${3 / k}px`)
       .text(n => `${n.airport} ${pct(at(n.gcn, h))}`);
+
+    if (op && xy(dst)) gRoute.selectAll("path").data([0]).join("path")
+      .attr("d", path({ type: "LineString", coordinates: [[o.lon, o.lat], [dst.lon, dst.lat]] }))
+      .attr("class", "route").attr("stroke", vcol).attr("stroke-width", 3.5 / k);
+    gRoute.selectAll("circle.wx").data(mapView.weather ? ends.filter(a => wxAt.has(a.airport)) : [], a => a.airport).join("circle")
+      .attr("class", "wx").attr("cx", a => xy(a)[0]).attr("cy", a => xy(a)[1]).attr("r", 12 / k).attr("stroke-width", 2 / k);
+    gRoute.selectAll("circle.end").data(ends, a => a.airport).join("circle")
+      .attr("class", "end").attr("cx", a => xy(a)[0]).attr("cy", a => xy(a)[1]).attr("r", 7 / k).attr("fill", vcol).attr("stroke-width", 2 / k);
+    gRoute.selectAll("text").data(ends, a => a.airport).join("text")
+      .attr("class", "end-label").attr("x", a => xy(a)[0] + 10 / k).attr("y", a => xy(a)[1] - 8 / k)
+      .style("font-size", `${14 / k}px`).style("stroke-width", `${3 / k}px`).text(a => a.airport);
 
     renderSide(h);
   }
@@ -112,25 +135,46 @@ async function map(box) {
         out.push(el("p", `Strongest links, the simpler order: ${d.links.top_by_weight.join(", ")}. ${d.uncertainty.gcn_order}`, "muted small"));
       }
     }
-    if (mapView.weather) {
-      out.push(el("h3", "Weather at forecast time"));
-      [d.weather.origin, d.weather.dest].forEach(w => {
-        if (w.limited) { out.push(el("p", w.reason, "muted small")); return; }
-        out.push(el("p", w.airport, "small strong"));
-        out.push(el("pre", w.metar ? `METAR ${w.metar.text}` : "No observation in the last 3 hours.", "wx"));
-        out.push(el("pre", w.taf ? `TAF issued ${w.taf.issued_utc} UTC\n` + w.taf.lines.join("\n") : "No TAF issued in the data window.", "wx"));
-      });
-    }
     side.replaceChildren(...out);
   }
 
+  // Weather in plain words (murphy/wxtext.py), the original reports one click away.
+  function renderWeather() {
+    if (!mapView.weather) { wxBox.replaceChildren(); return; }
+    const cols = el("div", null, "wx-grid");
+    [[d.weather.origin, "departure"], [d.weather.dest, "arrival"]].forEach(([w, role]) => {
+      const c = el("div", null, "wx-card");
+      c.append(el("h3", `${w.airport} · at your ${role}`));
+      if (w.limited) { c.append(el("p", w.reason, "muted small")); cols.append(c); return; }
+      const f = w.notable_at_flight;
+      c.append(el("p", f == null ? `The latest forecast does not reach your ${role} (${w.flight_time}).`
+        : f.length ? `Watch for, around ${w.flight_time}: ${f.join(", ")}.` : `Nothing notable forecast around ${w.flight_time}.`,
+        f && f.length ? "wx-flag" : "muted small"));
+      if (w.metar) { const p = el("p", null, "small"); p.append(el("span", `Now (${w.metar.plain.when.replace("Observed ", "observed ")}): `, "strong"), w.metar.plain.text); c.append(p); }
+      else c.append(el("p", "No observation in the 3 hours before the forecast.", "muted small"));
+      if (w.taf) {
+        c.append(el("p", `Forecast issued ${w.taf.issued_local}. Highlighted: around your ${role}.`, "muted small"));
+        const ul = el("ul", null, "wx-list");
+        w.taf.plain.forEach(x => { const li = el("li", null, x.near ? "near" : ""); li.append(el("span", x.when + ": ", "strong"), x.text); ul.append(li); });
+        c.append(ul);
+      } else c.append(el("p", "No forecast (TAF) issued in the data window.", "muted small"));
+      c.append(sources("The original reports", ...(w.metar ? [`METAR, known ${w.metar.known_at} UTC: ${w.metar.text}`] : []),
+        ...(w.taf ? [`TAF, issued ${w.taf.issued_utc} UTC: ${w.taf.lines.join(" · ")}`] : []), w.source));
+      cols.append(c);
+    });
+    const thr = [d.weather.origin, d.weather.dest].find(w => w.thresholds)?.thresholds;
+    wxBox.replaceChildren(el("h3", "Weather, as known at forecast time"), cols,
+      ...(thr ? [el("p", `"Watch for" uses murphy's simple thresholds, not an aviation rule: ${thr}. Times are local to each airport.`, "muted small")] : []));
+  }
+
   renderTimeline(timeline);
+  renderWeather();
   const lim = [...d.uncertainty.limits]; if (offMap) lim.push(`${offMap} airports fall outside the map's projection and are not drawn.`);
   const p = d.provenance;
   notes.replaceChildren(sources("Where the map's numbers came from", `GCN: ${p.gcn}. Regions: ${p.regions}. Links: ${p.links}.`,
     `Forecast as of ${p.forecast_as_of_utc} UTC; the slider's last hour is ${p.forecast_hour_utc} UTC. Decision record ${p.decisions.join(", ")}.`,
     ...lim));
-  draw();
+  if (mapView.zoom) svg.call(zoom.transform, mapView.zoom); else draw();
 }
 
 // --- Alternatives as a timeline beside the route (0025): same route, so a bar per flight in time.

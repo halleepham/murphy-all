@@ -81,3 +81,13 @@ the floating button. **Owner chose the floating button.** The results page now u
 a round button at the bottom right opens Ask murphy as a card over the page (× or Esc closes it).
 Only the card's messages scroll, since an overlay cannot grow past the screen. Checked in headless
 Chrome at 1400 and 500 px wide.
+
+## Change, 8 Nov 2026: wider Ask panel, evidence as tables
+
+**Owner:** make the open panel wider; format the evidence rows better, maybe a simple table.
+Panel is now up to 600 px wide. Evidence is one table per graph query, with plain column names
+(the glossary sent to the LLM, `graphrag.GLOSSARY`, is now returned with the answer and shown as the
+header tooltip). Fields equal in every row are written once above the table; a single row is shown
+as a two-column table. Source ids, "known at" times and the raw METAR sit in a tooltip on each [E]
+tag, so every row stays traceable. Checked in headless Chrome on real evidence rows saved in
+`data/graphrag/eval.jsonl`; no new Groq calls were made.

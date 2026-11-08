@@ -30,22 +30,36 @@ def inputs() -> dict | None:
             "links": pd.read_parquet(LINKS), "weather": weather_at}
 
 
-def weather_at(airport: str, as_of) -> dict:
-    """The latest observation and TAF known before as_of, as written. Limited outside the 30 airports."""
+def weather_at(airport: str, as_of, around=None) -> dict:
+    """The latest observation and TAF known before as_of: as written, and in plain words by fixed
+    rules (murphy/wxtext.py). `around`: the flight's time at this airport (UTC), so the forecast
+    periods near it are marked and flagged. Limited outside the 30 airports."""
+    from murphy import wxtext as wt
     from murphy.datalayer import asof
     from murphy.datalayer.weather import AIRPORTS as WX
     if airport not in WX:
         return {"airport": airport, "limited": True, "reason": f"No weather data for {airport}: murphy has it for 30 airports."}
     t = pd.Timestamp(as_of).tz_localize("UTC").to_pydatetime()
     obs, taf = asof.asos_as_of(t, airport, lookback_hours=3), asof.taf_as_of(t, airport)
-    o = obs.iloc[-1] if len(obs) else None
-    return {"airport": airport, "limited": False,
-            "metar": None if o is None else {"text": o.metar, "obs_utc": str(o.obs_utc), "known_at": str(o.known_at)},
-            "taf": None if taf.empty else {"issued_utc": str(taf.issued_utc.iloc[0]), "lines": taf.raw.tolist()},
-            "source": "IEM ASOS and TAF archive, known before the forecast time (0007)"}
+    tz = pd.read_parquet(AIRPORTS, columns=["airport", "tz"]).set_index("airport").tz.get(airport)
+    o = wt.obs_text(obs.iloc[-1], tz) if len(obs) else None
+    lines = wt.taf_lines(taf, tz, around) if len(taf) else []
+    near = [x for x in lines if x["near"]]
+    return {"airport": airport, "limited": False, "thresholds": wt.THRESHOLDS,
+            "flight_time": None if around is None else wt.local(around, tz),
+            "notable_now": wt.notable([o] if o else []),
+            "notable_at_flight": wt.notable(near) if near else None,  # None: the TAF does not reach the flight
+            "metar": None if o is None else {"plain": {"when": o["when"], "text": o["text"]}, "text": obs.metar.iloc[-1],
+                                             "obs_utc": str(obs.obs_utc.iloc[-1]), "known_at": str(obs.known_at.iloc[-1])},
+            "taf": None if taf.empty else {"issued_utc": str(taf.issued_utc.iloc[0]), "issued_local": wt.local(taf.issued_utc.iloc[0], tz),
+                                           "plain": [{k: x[k] for k in ("when", "text", "near")} for x in lines],
+                                           "lines": taf.raw.tolist()},
+            "source": "IEM ASOS and TAF archive, known before the forecast time (0007); "
+                      "plain words by fixed rules in murphy/wxtext.py"}
 
 
-def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame, links: pd.DataFrame, weather) -> dict:
+def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame, links: pd.DataFrame, weather,
+          dep_utc=None, arr_utc=None) -> dict:
     h = rank.hour_index(as_of)
     rows = list(range(h - HOURS_BACK, h + 1))  # oldest first; the last is the forecast hour
     ok = [0 <= r < len(scores) for r in rows]
@@ -83,7 +97,7 @@ def build(origin: str, dest: str, as_of, scores, big: dict, places: pd.DataFrame
             "airports": have[["airport", "name", "lat", "lon", "community", "big"]].assign(
                 big=have.big.astype(str) == "True", community=have.community.astype(int)).to_dict("records"),
             "gcn": gcn, "regions": regions, "links": lk,
-            "weather": {"origin": weather(origin, as_of), "dest": weather(dest, as_of)},
+            "weather": {"origin": weather(origin, as_of, dep_utc), "dest": weather(dest, as_of, arr_utc)},
             "provenance": {"gcn": f"{rank.SCORES}, predicted late share of departures in the next 3 hours (0017, 0022)",
                            "regions": "co-disruption communities, 2023-24 (0017)",
                            "links": "CO_DISRUPTS, 2023-24, exported from Neo4j (0018, 0025)",
