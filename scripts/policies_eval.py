@@ -42,7 +42,7 @@ RELEVANT = {
                                "9. Flight Changes, Cancellations, Delays, and Diversions — b."]},
     "change_myself": {"federal": [],
                       "DL": ["RULE 21: REROUTING — A", "RULE 21: REROUTING — C.", "RULE 16: FARES"],
-                      "WN": ["4. Tickets — c.", "3. Fares — e."]},
+                      "WN": ["4. Tickets — c.", "3. Fares — e.", "3. Fares — a."]},  # 3a added 8 Nov 2026: its (2) covers customer changes (0021)
     "missed_connection": {"federal": [],
                           "DL": ["RULE 19: FLIGHT DELAYS/CANCELLATIONS — A."],
                           "WN": ["9. Flight Changes, Cancellations, Delays, and Diversions — a.",
@@ -50,7 +50,7 @@ RELEVANT = {
     "tarmac": {"federal": ["14 CFR 259.4"],
                "DL": ["RULE 19: FLIGHT DELAYS/CANCELLATIONS — C."],
                "WN": []},
-    "bumped": {"federal": ["14 CFR 250.5", "14 CFR 250.8", "14 CFR 250.2b", "14 CFR 250.9"],
+    "bumped": {"federal": ["14 CFR 250.5", "14 CFR 250.6", "14 CFR 250.8", "14 CFR 250.2b", "14 CFR 250.9"],  # 250.6 added 8 Nov 2026 (0021)
                "DL": ["RULE 20: DENIED BOARDING"],
                "WN": ["9. Flight Changes, Cancellations, Delays, and Diversions — c."]},
 }

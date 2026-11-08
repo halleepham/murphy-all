@@ -196,3 +196,20 @@ of method; its finding stands.
   ice day at ATL (Finding 3).
 - The page says what is compared, in plain words; distances are in Technical details.
 - Embeddings are still built (`python -m murphy.pastdays`) so the comparison can be rerun.
+
+## Finding 3, redone for plain numbers, 8 Nov 2026 (AI marked; owner to check)
+
+The five retrievals of Finding 3 were marked for embeddings, which the app no longer uses (Decision
+8). Same five days, plain-numbers search, top 4 of the 10 shown; thin above distance 3.16:
+
+| Query | Actual | Plain numbers, mean of 10 | Distance | Mark |
+|---|---|---|---|---|
+| EWR 19 Jan 2025, snow, 0.5 mi | 41.3% | 40.3% | 6.81, thin | Partly relevant: top 2 are snow days with low visibility; 3 and 4 are fog without snow. The app shows no percent (thin), although the mean was close |
+| BNA 19 May 2025, showers, storms at times | 31.8% | 27.1% | 1.62 | Relevant: all 4 have storms at times, May or June |
+| BWI 23 Apr 2025, calm | 25.6% | 23.1% | 0.96 | Relevant match; late shares 17-33%: calm weather does not settle it (as before) |
+| IAH 24 Apr 2025, mist, clouds 1,200 ft | 32.7% | 16.8% | 1.55 | Relevant matches, wrong outcome: the weather matched, the day went worse for another reason |
+| ATL 10 Jan 2025, freezing rain | 98.9% | 20.5% | 26.41, thin | Correctly thin: no earlier ice day at ATL; the closest has freezing drizzle at times only |
+
+Compared with embeddings: BNA's matches are tighter (all four have storms); EWR is now flagged thin
+where embeddings answered; ATL stays thin. The calendar crowding noticed in Finding 3 does not show
+here: matches come from several months and years.

@@ -63,7 +63,7 @@ flight, so they are stated limitations, not per-flight signals.
 | Does network information help? | With and without communities; with and without GNN | Measured on 2025 (`0017` Finding 4): small Brier gain, net about the same |
 | Are recommendations good? | No change at all; a traveler's rule of thumb (`0014`). Climatology and the schedule-only model almost never act | Measured on 2025 with `final_clean` (`0014` Finding 3) |
 | Do trust checks help? | The recommender with and without them | Not built |
-| Is retrieval good? | Vector vs BM25 | Past days: plain numbers slightly best, all beat averages; the app uses plain numbers (`0020`, 8 Nov). Policies: embeddings 13 of 16 vs BM25 8, not significant (`0021` Finding 1) |
+| Is retrieval good? | Vector vs BM25 | Past days: plain numbers slightly best, all beat averages; the app uses plain numbers (`0020`, 8 Nov). Policies: embeddings 14 of 16 vs BM25 8, not significant, p = 0.070 (`0021` Finding 1, marks corrected 8 Nov) |
 | Are answers grounded? | GraphRAG vs plain retrieval; every value traces to a source | First run on 4 flights (`0019` Finding 2): graph 6 of 7 key facts, BM25 5 of 7, none 0 |
 
 **Are recommendations good?** Replay real trips, assuming the traveler takes the

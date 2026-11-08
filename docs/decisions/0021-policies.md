@@ -132,3 +132,31 @@ not say so.
 `murphy/app/server.py`, "What the rules say" on the page. Tests: `tests/test_policies.py` and
 the policies tests in `tests/test_app.py`. Checked in the running app on 7 Nov 2026: Delta,
 Southwest and United flights (United gets the federal-only note).
+
+## Check of the marks, 8 Nov 2026 (AI checked; owner to confirm)
+
+Owner asked the AI to look through the pending checks. For each of the 16 pairs, the top 3 passages
+were read in full against `RELEVANT`. Every marked section that came up is relevant. Two passages
+were relevant but unmarked:
+
+1. `Southwest 3. Fares — a` (part 1/4), for "I want to switch flights myself": its (2) covers
+   changes the customer makes. **Confirms the correction above.**
+2. `14 CFR 250.6` Exceptions to eligibility for denied boarding compensation, for "Bumped" (both
+   airlines): it says when a bumped passenger gets no compensation. **New.**
+
+Borderline, left unmarked: Southwest `2. Reservations — a` part 3/5 (what happens to a Choice fare
+not changed before departure) for "switch flights myself"; `14 CFR 259.8` (the airline must tell you
+of a change) for "schedule change", as noted above.
+
+Both marks added to `scripts/policies_eval.py` and the test rerun:
+
+| Method | Top 3 holds a relevant passage, 7 Nov | 8 Nov, marks corrected |
+|---|---|---|
+| Embeddings | 13 of 16 | **14 of 16** |
+| BM25 | 8 of 16 | 8 of 16 |
+| Random | 0.15 | 0.15 |
+
+Pairs only embeddings hit: 7; only BM25: 1; exact sign test p = 0.070 (was 0.125). Still not
+significant on 16 pairs. The two misses are Southwest hotel or meals (nothing relevant exists in
+its contract; federal 259.5 and 259.9 rank far down) and Southwest schedule change (first relevant at
+rank 4). The app's search is unchanged; only the scoring marks changed.
