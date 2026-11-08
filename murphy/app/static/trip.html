@@ -238,9 +238,9 @@ async function pastdays(box) {
     });
     wrap.append(t);
     out.push(fold(`See the ${d.days.length} days`, `Today's forecast: ${weather(d.query.text)} Most similar days first.`, wrap));
-    out.push(fold("How to read this", "Murphy looks for earlier days when the airport's weather forecast read most like today's, then counts how those days went. It describes the airport, not your flight."));
+    out.push(fold("How to read this", "Murphy looks for earlier days at the airport whose weather forecast was closest to today's: visibility, cloud height, wind, and rain, snow or storms, with the time of year. Then it counts how those days went. It describes the airport, not your flight."));
     out.push(fold("Technical details", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}.`,
-      `Similarity of each day: ${d.days.map(x => `${x.date} ${x.similarity.toFixed(3)}`).join(", ")}. Mean ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
+      `Distance of each day (smaller is closer): ${d.days.map(x => `${x.date} ${x.distance.toFixed(2)}`).join(", ")}. Mean ${u.mean_distance == null ? "none" : u.mean_distance.toFixed(2)}; above ${u.thin_above} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
   }
   if (tab === "pastdays") box.replaceChildren(...out);
 }

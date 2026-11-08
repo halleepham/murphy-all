@@ -175,3 +175,24 @@ now, as the course's vector retrieval; the owner may switch to plain numbers.
 moved from 0.920 to 0.930 with the new wording (at 0.920 only 248 days would be thin). Set to
 0.930: 562 days below, error 0.102 against 0.082 above, the same split as before. Error by fifth
 of similarity, lowest to highest: 0.105, 0.094, 0.079, 0.072, 0.065.
+
+## Decision 8 — The app searches by plain numbers, not embeddings (8 Nov 2026)
+
+**Owner asked** why the app used embeddings when they scored worst. **AI's answer:** Decision 5
+chose them as the course's vector retrieval, while the three methods tied; after the mph rebuild
+plain numbers are measurably, if barely, better (above). **Owner decided:** switch Similar days to
+plain numbers; the Rules tab (`0021`) is the app's vector retrieval. Supersedes Decision 5's choice
+of method; its finding stands.
+
+- `similar` now calls `search(..., "numeric")`: nearest neighbors on standardized forecast numbers
+  (visibility, cloud base, wind, gusts, weather-type flags) and calendar (month, weekday), same
+  airport, earlier days only, top 10. The app loads the corpus only: no embedding model at run time.
+- **Thin evidence (Decision 6), re-derived for distance:** thin when the mean distance of the 10 days
+  is above 3.16, the 2025 95th percentile (548 days). Error above it 0.135, below 0.079. Error by
+  fifth of distance, closest to farthest: 0.061, 0.065, 0.075, 0.096, 0.113. A sharper warning than
+  embedding similarity gave (0.102 against 0.082).
+- Checked on live trips: F9 4195 LGA, 9 Jan 2025, mean distance 1.68, answered; the ATL ice-storm
+  trips of 10 Jan (AA 3104, WN 864) are thin (distances 25.6 and 15.7), as with embeddings: no earlier
+  ice day at ATL (Finding 3).
+- The page says what is compared, in plain words; distances are in Technical details.
+- Embeddings are still built (`python -m murphy.pastdays`) so the comparison can be rerun.

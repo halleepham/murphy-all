@@ -113,7 +113,7 @@ def pastdays_index():
             from murphy import pastdays as pdays
             if not (pdays.OUT / "corpus.parquet").exists():
                 return None
-            state["ix"] = pdays.Index(pd.read_parquet(pdays.OUT / "corpus.parquet"), np.load(pdays.OUT / "embed.npy"))
+            state["ix"] = pdays.Index(pd.read_parquet(pdays.OUT / "corpus.parquet"))  # plain numbers: no embeddings needed
         return state["ix"]
     return index
 

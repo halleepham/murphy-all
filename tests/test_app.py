@@ -203,14 +203,14 @@ def past_client(client, tmp_path):
     trips = pd.DataFrame([trip("high", .2) | {"origin": "ORD"}, trip("far", .2) | {"origin": "ABQ"}])
     con.execute("CREATE TABLE trips AS SELECT * FROM trips")
     con.close()
-    return TestClient(create_app(path, past_index=lambda: trip_index(80, 0.99), taf_as_of=fake_taf(date(2025, 3, 1))))
+    return TestClient(create_app(path, past_index=lambda: trip_index(80), taf_as_of=fake_taf(date(2025, 3, 1))))
 
 
 def test_similar_past_days_for_a_trip(past_client):
     d = past_client.get("/api/pastdays", params={"flight_id": "high"}).json()
     assert d["status"] == "ok" and d["answer"]["days"] == 10
     assert all(x["date"] < "2025-03-01" for x in d["days"])      # the trip's own day never shows
-    assert d["provenance"]["decisions"] == ["0020"] and d["uncertainty"]["thin_below"] == 0.93
+    assert d["provenance"]["decisions"] == ["0020"] and d["uncertainty"]["thin_above"] == 3.16
 
 
 def test_similar_past_days_refuses_unknown_and_says_no_weather(past_client):

@@ -157,20 +157,18 @@ def fake_taf(day, empty=False):
     return f
 
 
-def trip_index(n, sim):
-    """n snowy ORD days from 1 Jan 2025; the query's embedding has cosine `sim` with each."""
-    c = corpus([(d, True, 0.1 + 0.01 * i) for i, d in enumerate(days(n, date(2025, 1, 1)))])
+def trip_index(n, snowy=True):
+    """n ORD days from 1 Jan 2025, all snowy (close to the fake TAF's light snow) or all calm (far)."""
+    c = corpus([(d, snowy, 0.1 + 0.01 * i) for i, d in enumerate(days(n, date(2025, 1, 1)))])
     c["n_dep"], c["n_late"], c["product_id"] = 100, 10, "P"
-    ix = Index(c, np.tile([1.0, 0.0], (n, 1)))
-    ix._encode = lambda texts: np.array([[sim, np.sqrt(1 - sim ** 2)]])
-    return ix
+    return Index(c)  # the app searches with plain numbers: no embeddings
 
 
 DAY, AS_OF, TZ = date(2025, 1, 20), datetime(2025, 1, 20, 12), "America/Chicago"
 
 
 def test_trip_answer_uses_only_earlier_days_and_shows_the_range():
-    r = pd_.similar(trip_index(30, 0.99), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))
+    r = pd_.similar(trip_index(30), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))
     assert r["status"] == "ok" and r["answer"]["days"] == pd_.K
     assert all(d["date"] < str(DAY) for d in r["days"])          # never the trip's own day
     shares = [d["late_share"] for d in r["days"]]
@@ -179,15 +177,15 @@ def test_trip_answer_uses_only_earlier_days_and_shows_the_range():
 
 
 def test_trip_thin_when_no_close_days_shows_no_percent():
-    r = pd_.similar(trip_index(30, 0.5), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))
+    r = pd_.similar(trip_index(30, snowy=False), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))
     assert r["status"] == "thin" and r["answer"] is None and len(r["days"]) == pd_.K
 
 
 def test_trip_thin_when_too_few_days_or_no_taf():
-    assert pd_.similar(trip_index(5, 0.99), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))["status"] == "thin"
-    r = pd_.similar(trip_index(30, 0.99), "ORD", DAY, AS_OF, TZ, fake_taf(DAY, empty=True))
+    assert pd_.similar(trip_index(5), "ORD", DAY, AS_OF, TZ, fake_taf(DAY))["status"] == "thin"
+    r = pd_.similar(trip_index(30), "ORD", DAY, AS_OF, TZ, fake_taf(DAY, empty=True))
     assert r["status"] == "thin" and r["query"] is None and "TAF" in r["uncertainty"]["reason"]
 
 
 def test_trip_outside_the_30_airports_says_so():
-    assert pd_.similar(trip_index(30, 0.99), "ABQ", DAY, AS_OF, None, fake_taf(DAY))["status"] == "no_weather"
+    assert pd_.similar(trip_index(30), "ABQ", DAY, AS_OF, None, fake_taf(DAY))["status"] == "no_weather"

@@ -261,7 +261,10 @@ class Index:
 
 # ---------------------------------------------------------------- one trip (the app)
 
-THIN_BELOW = 0.930  # mean similarity of the k days; 2025 5th percentile (0020 Decision 6; re-measured after the mph wording)
+# The app searches with plain numbers (0020, 8 Nov 2026): closest in weather and calendar, measured
+# as distance. Thin above the 2025 95th percentile of the mean distance of the k days.
+METHOD = "numeric"
+THIN_ABOVE = 3.16  # 2025 95th percentile, scripts/pastdays_eval.py (0020 Decision 6, re-derived for distance)
 
 
 def similar(ix: Index, airport: str, day: date, as_of: datetime, tz: str, taf_as_of=None) -> dict:
@@ -272,11 +275,12 @@ def similar(ix: Index, airport: str, day: date, as_of: datetime, tz: str, taf_as
     if taf_as_of is None:
         from murphy.datalayer.asof import taf_as_of
     out = {"status": "ok", "answer": None, "query": None, "days": [],
-           "provenance": {"method": f"{MODEL}, cosine, same airport, top {K}",
+           "provenance": {"method": f"nearest neighbors on standardized forecast numbers (visibility, cloud base, wind, "
+                                    f"gusts, weather types) and calendar (month, weekday), same airport, top {K}",
                           "corpus": f"{airport} airport-days {YEARS[0]}-{YEARS[-1]}, before the forecast's local date",
                           "outcome": f"share of departures {LATE_MIN}+ min late or cancelled (BTS)",
                           "weather": "IEM TAF as issued", "decisions": ["0020"]},
-           "uncertainty": {"mean_similarity": None, "thin_below": THIN_BELOW, "reason": None}}
+           "uncertainty": {"mean_distance": None, "thin_above": THIN_ABOVE, "reason": None}}
     if airport not in AIRPORTS:
         return out | {"status": "no_weather"}
     before = pd.Timestamp(as_of).tz_localize("UTC").tz_convert(tz).date()
@@ -290,15 +294,15 @@ def similar(ix: Index, airport: str, day: date, as_of: datetime, tz: str, taf_as
     w = day_weather(taf)
     text = describe(airport, day, w)
     out["query"] = {"text": text, "taf_product_id": taf.product_id.iloc[0], "taf_known_at": str(taf.known_at.iloc[0])}
-    hit = ix.search(airport, before, text, numeric({"date": day, **w}), "embed")
+    hit = ix.search(airport, before, text, numeric({"date": day, **w}), METHOD)
     out["days"] = [{"date": str(r.date), "text": r.text, "late_share": float(r.late_share), "n_dep": int(r.n_dep),
-                    "n_late": int(r.n_late), "similarity": float(r.score), "taf_product_id": r.product_id}
+                    "n_late": int(r.n_late), "distance": -float(r.score), "taf_product_id": r.product_id}
                    for r in hit.itertuples()]
-    sim = float(hit.score.mean()) if len(hit) else None
-    out["uncertainty"]["mean_similarity"] = sim
+    dist = -float(hit.score.mean()) if len(hit) else None
+    out["uncertainty"]["mean_distance"] = dist
     if len(hit) < K:
         out["status"], out["uncertainty"]["reason"] = "thin", f"Only {len(hit)} earlier days at {airport}."
-    elif sim < THIN_BELOW:
+    elif dist > THIN_ABOVE:
         out["status"], out["uncertainty"]["reason"] = "thin", "No close past days: the most similar ones differ from this forecast."
     else:
         out["answer"] = {"late_share": float(hit.late_share.mean()),
