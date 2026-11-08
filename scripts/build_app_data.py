@@ -5,7 +5,7 @@ record, which is the one place outcomes are used. Uses the app's model (MODEL in
 Usage: PYTHONPATH=. python scripts/build_app_data.py
 """
 import duckdb, numpy as np, pandas as pd
-from murphy.app.server import MODEL
+from murphy.app.server import CURVE, DEADLINES as APP_DEADLINES, MODEL
 from murphy.forecast.sample import ROOT
 from murphy.forecast.score import PCOLS
 from murphy.recommend import FIRM_FROM, UNSURE_FROM, made_it, p_make
@@ -14,7 +14,7 @@ R = ROOT / "data" / "forecast" / "alternatives" / f"replay_{MODEL}"
 F2025 = ROOT / "data" / "flights" / "2025_*.parquet"
 OUT = ROOT / "data" / "forecast" / "app" / "replay.duckdb"
 FARES = ROOT / "data" / "forecast" / "fares.parquet"
-DEADLINES = (30, 60, 120)  # alternatives were saved for these only (0013)
+DEADLINES = tuple(sorted(APP_DEADLINES))  # 0 to 120 min; alternatives were saved up to 120 min after (0013, 0024)
 
 
 def track_record() -> pd.DataFrame:
@@ -29,6 +29,17 @@ def track_record() -> pd.DataFrame:
             k = band == b
             rows.append({"deadline_min": buf, "band": b, "forecasts": int(k.sum()),
                          "predicted_miss": float(miss[k].mean()), "true_miss": float(missed[k].mean())})
+    return pd.DataFrame(rows)
+
+
+def typical() -> pd.DataFrame:
+    """The simpler line on the deadline chart (0024): the average 2025 flight's chance at each
+    deadline, by lead time. Forecasts only, no outcomes."""
+    c = pd.read_parquet(R / "current.parquet", columns=["lead_h", *PCOLS])
+    rows = []
+    for lead, g in c.groupby("lead_h"):
+        p = g[PCOLS].fillna(0).to_numpy()
+        rows += [{"lead_h": int(lead), "deadline_min": d, "chance": float(p_make(p, np.full(len(p), d)).mean())} for d in CURVE]
     return pd.DataFrame(rows)
 
 
@@ -54,11 +65,14 @@ def main() -> None:
     con.execute(f"CREATE TABLE fares AS SELECT * FROM read_parquet('{FARES}')")
     track = track_record()
     con.execute("CREATE TABLE track AS SELECT * FROM track")
+    typ = typical()
+    con.execute("CREATE TABLE typical AS SELECT * FROM typ")
     con.execute("CREATE INDEX trips_key ON trips (flight_id, lead_h)")
     con.execute("CREATE INDEX trips_find ON trips (flight_date, carrier, flight_number)")
     con.execute("CREATE INDEX alts_key ON alts (flight_id, lead_h)")
     print(con.execute("SELECT (SELECT count(*) FROM trips), (SELECT count(*) FROM alts), (SELECT count(*) FROM fares)").fetchall())
     print(track.round(4).to_string(index=False))
+    print(typ.pivot(index="deadline_min", columns="lead_h", values="chance").round(4).to_string())
     con.close()
 
 

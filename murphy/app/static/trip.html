@@ -23,8 +23,13 @@
         <label class="field">Forecast made
           <select id="lead"><option value="24">24 h before</option><option value="6">6 h before</option><option value="2" selected>2 h before</option></select></label>
         <label class="field">Deadline after arrival
-          <select id="deadline"><option value="30">30 min</option><option value="60" selected>60 min</option><option value="120">120 min</option></select></label>
+          <select id="deadline"></select></label>
       </div>
+    </div>
+    <div class="whatif" id="whatif" hidden>
+      <div class="whatif-head"><h3>What if your deadline changes?</h3><span class="muted small">Click or drag on the chart to set your deadline.</span></div>
+      <div class="chart-box"><canvas id="chart" aria-label="Chance of making it by deadline"></canvas></div>
+      <p class="muted small" id="whatif-note"></p>
     </div>
     <details id="where" hidden style="margin-top:12px"><summary class="small">Where this forecast came from</summary><p class="muted small" id="where-text"></p></details>
   </section>
@@ -41,6 +46,7 @@
  </aside>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="/static/common.js"></script>
 <script>
 const WORDS = {
@@ -74,7 +80,7 @@ const sources = (summary, ...lines) => { const d = el("details"); d.append(el("s
 async function load() {
   try { trip = await get("/api/trip?" + params({ max_earlier_h: settings.max_earlier_h, sort: settings.sort })); }
   catch (e) { $("head").replaceChildren(el("p", e.message, "error")); $("summary").hidden = $("tabs").hidden = true; $("panel").replaceChildren(); return; }
-  renderHead(); renderTabs(); openTab(tab); renderAsk();
+  renderHead(); renderChart(); renderTabs(); openTab(tab); renderAsk();
 }
 
 function renderHead() {
@@ -89,6 +95,75 @@ function renderHead() {
   const p = trip.provenance;
   $("where-text").textContent = `Model ${p.model}, forecast as of ${p.forecast_as_of_utc} UTC (${p.lead_h} h before departure). ${p.data}. Flight record ${f.flight_id}. Decision records: ${p.decisions.join(", ")}. Limits are on the About page.`;
   $("where").hidden = false;
+}
+
+// --- Deadline what-if (0024): every value comes from the server's p_make; the page only draws. --
+let chart = null;
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const marker = {  // the traveler's deadline, and the range past what was checked
+  id: "marker",
+  beforeDatasetsDraw(c) {
+    const { ctx, chartArea: a, scales: { x } } = c, cut = x.getPixelForValue(trip.curve.checked_to);
+    ctx.save(); ctx.fillStyle = css("--line"); ctx.globalAlpha = .45; ctx.fillRect(cut, a.top, a.right - cut, a.bottom - a.top);
+    ctx.globalAlpha = 1; ctx.fillStyle = css("--muted"); ctx.font = "12px " + css("--font"); ctx.textAlign = "center";
+    ctx.fillText("not checked", (cut + a.right) / 2, a.bottom - 8); ctx.restore();
+  },
+  afterDatasetsDraw(c) {
+    const { ctx, chartArea: a, scales: { x } } = c, px = x.getPixelForValue(c.$deadline);
+    ctx.save(); ctx.strokeStyle = css("--text"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = css("--text"); ctx.font = "600 12px " + css("--font"); ctx.textAlign = px > a.right - 60 ? "right" : "left";
+    ctx.fillText(`your deadline: ${c.$deadline} min`, px + (ctx.textAlign === "left" ? 6 : -6), a.bottom - 8); ctx.restore();
+  },
+};
+
+function renderChart() {
+  const c = trip.curve, pts = ys => c.deadline_min.map((d, i) => ({ x: d, y: 100 * ys[i] }));
+  const sets = [{ label: "This flight", data: pts(c.chance), borderColor: css("--accent"), backgroundColor: css("--accent"), borderWidth: 3 }];
+  if (c.best_alt) sets.push({ label: `Best alternative (${c.best_alt.flight})`, data: pts(c.best_alt.chance), borderColor: css("--good"), backgroundColor: css("--good"), borderWidth: 2 });
+  if (c.typical.length) sets.push({ label: "Typical 2025 flight", data: pts(c.typical), borderColor: css("--muted"), backgroundColor: css("--muted"), borderWidth: 2, borderDash: [6, 4] });
+  sets.forEach(s => Object.assign(s, { stepped: "before", pointRadius: 0, pointHoverRadius: 4, fill: false }));
+  const deadline = +$("deadline").value;
+  if (chart) { chart.data.datasets = sets; chart.$deadline = deadline; chart.update("none"); }
+  else {
+    Chart.defaults.font.family = css("--font"); Chart.defaults.color = css("--muted");
+    chart = new Chart($("chart"), {
+      type: "line", data: { datasets: sets }, plugins: [marker],
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: "index", axis: "x", intersect: false },
+        scales: {
+          x: { type: "linear", min: 0, max: 180, ticks: { stepSize: 30, callback: v => `+${v}` }, grid: { color: css("--line") },
+               title: { display: true, text: "Minutes after scheduled arrival" } },
+          y: { min: 0, max: 100, ticks: { stepSize: 25, callback: v => v + "%" }, grid: { color: css("--line") },
+               title: { display: true, text: "Chance of making it" } },
+        },
+        plugins: {
+          legend: { position: "top", align: "start", labels: { boxWidth: 14, boxHeight: 2 } },
+          tooltip: { callbacks: { title: i => `Deadline +${i[0].parsed.x} min` + (i[0].parsed.x > c.checked_to ? " (not checked)" : ""),
+                                  label: i => `${i.dataset.label}: ${i.parsed.y.toFixed(0)}%` } },
+        },
+      },
+    });
+    chart.$deadline = deadline;
+    // Click or drag to move the deadline; the page reloads the advice when the pointer is released.
+    let dragging = false;
+    const at = e => {
+      const v = chart.scales.x.getValueForPixel(e.clientX - canvas.getBoundingClientRect().left);
+      return Math.max(0, Math.min(c.checked_to, Math.round(v / 15) * 15));
+    };
+    const canvas = $("chart");
+    canvas.addEventListener("pointerdown", e => { dragging = true; canvas.setPointerCapture(e.pointerId); chart.$deadline = at(e); chart.draw(); });
+    canvas.addEventListener("pointermove", e => { if (dragging) { chart.$deadline = at(e); chart.draw(); } });
+    canvas.addEventListener("pointerup", () => {
+      dragging = false;
+      if (String(chart.$deadline) !== $("deadline").value) { $("deadline").value = chart.$deadline; load(); }
+    });
+  }
+  const i = c.deadline_min.indexOf(deadline), alt = c.best_alt ? `, the best alternative ${pct(c.best_alt.chance[i])}` : "";
+  $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight at this lead time ${pct(c.typical[i])}. Past +${c.checked_to} min the advice was not checked, so the deadline stops there.`;
+  $("whatif").hidden = false;
 }
 
 function renderTabs() {
@@ -220,6 +295,7 @@ async function ask(key, text) {
   box.replaceChildren(...out);
 }
 
+for (let d = 0; d <= 120; d += 15) { const o = el("option", `${d} min`); o.value = d; if (d === 60) o.selected = true; $("deadline").append(o); }
 if (!flightId) location.href = "/";
 else { ["lead", "deadline"].forEach(id => $(id).addEventListener("change", load)); load(); }
 </script>

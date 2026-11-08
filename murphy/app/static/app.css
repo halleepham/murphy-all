@@ -83,6 +83,13 @@ details summary { cursor: pointer; color: var(--accent); }
 ul.evidence { padding-left: 18px; font-size: .85rem; word-break: break-word; }
 ul.evidence li + li { margin-top: 6px; }
 blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); }
+/* Deadline what-if chart */
+.whatif { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.whatif-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
+.whatif-head h3 { font-size: 1rem; }
+.chart-box { position: relative; height: 260px; cursor: crosshair; touch-action: none; }
+.whatif p { margin: 8px 0 0; }
+
 /* Results page: content on the left, Ask sidebar on the right */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; max-width: 1280px; }
 .assistant { position: sticky; top: 16px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 10px; }

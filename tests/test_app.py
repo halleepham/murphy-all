@@ -32,8 +32,10 @@ def client(tmp_path_factory):
                          alt("high", "a4", .95, "UA", earlier_h=3), alt("mid", "a5", .9, "UA"), alt("low2", "a6", .5, "UA"),
                          alt("jan", "a7", .9, "UA")])
     fares = pd.DataFrame({"origin": ["LGA", "LGA"], "dest": ["ORD", "ORD"], "carrier": ["UA", "DL"], "tickets": [100, 100], "fare": [300.0, 200.0]})
-    track = pd.DataFrame([{"deadline_min": 60, "band": b, "forecasts": 10, "predicted_miss": .5, "true_miss": .6} for b in ("keep", "too_uncertain", "high")])
-    for name in ("trips", "alts", "fares", "track"):
+    track = pd.DataFrame([{"deadline_min": d, "band": b, "forecasts": 10, "predicted_miss": .5, "true_miss": .6}
+                          for d in range(0, 121, 15) for b in ("keep", "too_uncertain", "high")])
+    typical = pd.DataFrame([{"lead_h": 2, "deadline_min": d, "chance": .8} for d in range(0, 181, 15)])
+    for name in ("trips", "alts", "fares", "track", "typical"):
         con.execute(f"CREATE TABLE {name} AS SELECT * FROM {name}")
     con.close()
     return TestClient(create_app(path))
@@ -89,7 +91,8 @@ def test_high_risk_with_nothing_to_offer(client):
 
 def test_unknown_flight_and_bad_settings_are_refused(client):
     assert get(client, "nope").status_code == 404
-    assert get(client, "low", deadline_min=45).status_code == 422
+    assert get(client, "low", deadline_min=50).status_code == 422  # not a 15-minute step
+    assert get(client, "low", deadline_min=135).status_code == 422  # past what was checked (0024)
     assert get(client, "low", sort="vibes").status_code == 422
 
 
@@ -278,3 +281,29 @@ def test_the_about_page_states_every_limit_the_app_has(client):  # 0023: limits 
     from murphy.app.server import LIMITS
     about = client.get("/about").text
     assert all(x in about for x in LIMITS)
+
+
+# --- The deadline what-if curve (0024) ------------------------------------------------------------
+
+def test_every_checked_deadline_step_is_offered(client):
+    for d in range(0, 121, 15):
+        assert get(client, "high", deadline_min=d).status_code == 200
+
+
+def test_the_curve_matches_the_chance_at_each_deadline_and_never_falls(client):
+    c = get(client, "high").json()["curve"]
+    assert c["deadline_min"] == list(range(0, 181, 15)) and c["checked_to"] == 120
+    assert all(b >= a for a, b in zip(c["chance"], c["chance"][1:]))
+    for i, d in enumerate(c["deadline_min"][:9]):
+        assert c["chance"][i] == get(client, "high", deadline_min=d).json()["answer"]["chance"]
+
+
+def test_the_curve_shows_the_best_alternative_and_the_typical_flight(client):
+    c = get(client, "high").json()["curve"]
+    assert c["best_alt"]["flight"] == "UA 9" and c["best_alt"]["chance"][4] == pytest.approx(.9)
+    assert c["typical"] == [.8] * 13  # the simpler line to compare against
+
+
+def test_no_best_alternative_curve_when_nothing_is_better(client):  # thin evidence: nothing to compare
+    assert get(client, "alone").json()["curve"]["best_alt"] is None
+    assert get(client, "low").json()["curve"]["best_alt"] is None

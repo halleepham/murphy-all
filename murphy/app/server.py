@@ -22,7 +22,9 @@ from murphy.recommend import FIRM_FROM, MAX_EARLIER_H, UNSURE_FROM, p_make, verd
 DB = ROOT / "data" / "forecast" / "app" / "replay.duckdb"
 MODEL = "final_network"  # 0017; scripts/build_app_data.py reads its replay
 LEADS = {24, 6, 2}
-DEADLINES = {30, 60, 120}
+CHECKED_TO = 120  # alternatives were saved up to 120 min after the original's arrival (0013); band checked to here (0024)
+DEADLINES = set(range(0, CHECKED_TO + 1, 15))
+CURVE = list(range(0, 181, 15))  # the chart draws the forecast's full range; past CHECKED_TO it is marked unchecked
 STATIC = Path(__file__).parent / "static"
 LIMITS = [
     "Replay of 2025 only. Forecasts exist for sampled flights at 24, 6 and 2 hours before departure.",
@@ -40,7 +42,8 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
     if t.empty:
         return None
     t = t.iloc[0]
-    current = float(p_make(t[PCOLS].fillna(0).to_numpy(dtype=float)[None], [deadline_min])[0])
+    probs = t[PCOLS].fillna(0).to_numpy(dtype=float)
+    current = float(p_make(probs[None], [deadline_min])[0])
     a = con.execute(f"SELECT alt, alt_lead, arr_ahead_min, carrier, flight_number, flight_date, crs_dep_local, crs_arr_local, {cols} "
                     "FROM alts WHERE flight_id = ? AND lead_h = ? AND arr_ahead_min + ? >= 0 AND alt_lead - lead_h >= ?",
                     [flight_id, lead_h, deadline_min, -max_earlier_h]).df()
@@ -56,6 +59,17 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
                          "same_airline": r.carrier == t.carrier,
                          "cost": estimated_fare(fares, t.origin, t.dest, r.carrier)})
     best = alts[0]["chance"] if alts else None
+    # The what-if curve (0024): the same p_make at every deadline, for this flight, its best
+    # alternative at the chosen deadline, and the average 2025 flight at this lead time.
+    curve = {"deadline_min": CURVE, "checked_to": CHECKED_TO,
+             "chance": [float(x) for x in p_make(np.repeat(probs[None], len(CURVE), 0), CURVE)],
+             "best_alt": None,
+             "typical": [float(x) for x in con.execute("SELECT chance FROM typical WHERE lead_h = ? ORDER BY deadline_min",
+                                                       [lead_h]).df().chance]}
+    if alts and alts[0]["best"]:
+        r = a.iloc[0]
+        curve["best_alt"] = {"flight": alts[0]["flight"], "chance": [float(x) for x in p_make(
+            np.repeat(r[PCOLS].fillna(0).to_numpy(dtype=float)[None], len(CURVE), 0), np.array(CURVE) + r.arr_ahead_min)]}
     if sort == "price":  # no estimate goes last; ties keep the order by chance
         alts.sort(key=lambda x: (x["cost"]["fare"] is None, x["cost"]["fare"] or 0))
     v = verdict(current, best, bool(t.known_cancelled))
@@ -66,6 +80,7 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
             "flight": {"flight": f"{t.carrier} {t.flight_number}", "flight_id": t.flight_id, "date": str(t.flight_date)[:10],
                        "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local},
             "alternatives": alts,
+            "curve": curve,
             "askable": GRAPH_WINDOW[0] <= str(t.flight_date)[:10] <= GRAPH_WINDOW[1],
             "policy_situation": pol.DEFAULT_SITUATION[v],
             "provenance": {"model": MODEL, "forecast_as_of_utc": str(t.as_of_utc), "lead_h": int(t.lead_h),
