@@ -172,6 +172,15 @@ until the `why` answers are rerun on a Groq day.
 Itinerary text → validated schema; plain-language explanations; at least one
 presentation beyond a static chart, such as a what-if on the user's deadline.
 Generated content must match the computed findings.
+*Built (`0023`):* landing, results and about pages; results in tabs (Options, Similar days,
+Rules) with Ask as a right sidebar; limits on the About page.
+*Built (`0024`):* the deadline what-if chart, any 15-minute deadline to 120 min, the band checked at
+each step; the typical 2025 flight as the simpler line.
+*Decided (`0025`):* one d3 map with layers (route + alternatives timeline, regions, linked
+airports, weather, time slider). Not built.
+*Still to do:* trip text to a checked schema; a generated explanation labeled as a what-if;
+a feedback loop on Ask answers (course Challenge 4 Task 3 asks for human validation and a
+refined response).
 
 ### 7. Finish the application.
 
