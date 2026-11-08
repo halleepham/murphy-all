@@ -148,3 +148,30 @@ sentence leaves the wind out. `forecast/features.py` reads the same field.
 | Add to the app with embeddings | accepted | helps modestly; meets vector retrieval; ties simpler methods |
 | Thin below 0.920 mean similarity | accepted | 5th percentile; low similarity misses more |
 | Show the 10 days' range | accepted | the days can disagree widely |
+
+## Change, 8 Nov 2026: the sentences say mph; index rebuilt and re-scored
+
+**Owner** (with `0023`'s plain-words rule): the day sentences should not say "kt". `describe` now
+writes wind in mph (knots x 1.15078); the windy threshold is unchanged (20 kt, or gusts 30 kt).
+Index rebuilt (`python -m murphy.pastdays`, 9 min): 32,880 airport-days, every field but the text
+identical to before, no "kt" left. The old index and scores are kept in `private/pastdays-kt-backup/`.
+
+Re-scored with `scripts/pastdays_eval.py` (10,950 queries, 2025):
+
+| Method | MAE, kt (7 Nov) | MAE, mph (8 Nov) | Error minus embed, mph (95% CI) |
+|---|---|---|---|
+| embed | 0.0829 | 0.0831 | — |
+| bm25 | 0.0827 | 0.0828 | -0.0003 (-0.0012, 0.0006) |
+| numeric | 0.0821 | 0.0821 | -0.0010 (-0.0019, -0.0001) |
+| month | 0.0913 | 0.0913 | +0.0083 (0.0074, 0.0091) |
+| random | 0.1015 | 0.1015 | +0.0184 (0.0171, 0.0197) |
+
+Spearman within airport, embed: 0.467 before, 0.467 after. **What changed:** plain numbers are now
+ahead of embeddings by 0.1 point of error, and the interval just excludes zero (before, it just
+touched it). Decision 5 kept embeddings because they tied; it is now a very small loss. Kept for
+now, as the course's vector retrieval; the owner may switch to plain numbers.
+
+**Thin evidence (Decision 6):** the cutoff is the 2025 5th percentile of mean similarity, which
+moved from 0.920 to 0.930 with the new wording (at 0.920 only 248 days would be thin). Set to
+0.930: 562 days below, error 0.102 against 0.082 above, the same split as before. Error by fifth
+of similarity, lowest to highest: 0.105, 0.094, 0.079, 0.072, 0.065.

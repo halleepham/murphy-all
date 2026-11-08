@@ -113,8 +113,9 @@ def describe(airport: str, day: date, w: dict) -> str:
                      f"{'Poor visibility' if v < 3 else 'Visibility'} {v:g} mile{'' if v == 1 else 's'}.")
     if pd.notna(w["wind_max"]):
         windy = w["wind_max"] >= 20 or w["gust_max"] >= 30
-        s = f"{'Strong wind' if windy else 'Wind'} up to {w['wind_max']:.0f} kt"
-        parts.append(s + (f", gusts {w['gust_max']:.0f} kt." if w["gust_max"] else "."))
+        mph = 1.15078  # the TAF gives knots; the sentence says mph, which travelers read (0023). Thresholds stay in knots.
+        s = f"{'Strong wind' if windy else 'Wind'} up to {w['wind_max'] * mph:.0f} mph"
+        parts.append(s + (f", gusts {w['gust_max'] * mph:.0f} mph." if w["gust_max"] else "."))
     return " ".join(parts)
 
 
@@ -260,7 +261,7 @@ class Index:
 
 # ---------------------------------------------------------------- one trip (the app)
 
-THIN_BELOW = 0.920  # mean similarity of the k days; 2025 5th percentile (0020 Decision 6)
+THIN_BELOW = 0.930  # mean similarity of the k days; 2025 5th percentile (0020 Decision 6; re-measured after the mph wording)
 
 
 def similar(ix: Index, airport: str, day: date, as_of: datetime, tz: str, taf_as_of=None) -> dict:

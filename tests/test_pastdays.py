@@ -53,7 +53,7 @@ def test_describe():
          "wx": ["-SN"], "at_times": ["+TSRA"]}
     assert describe("ORD", date(2025, 1, 7), w) == (
         "ORD, a Tuesday in January. Light snow. At times heavy thunderstorms with rain. "
-        "Low clouds at 800 ft. Poor visibility 1 mile. Strong wind up to 25 kt, gusts 35 kt.")
+        "Low clouds at 800 ft. Poor visibility 1 mile. Strong wind up to 29 mph, gusts 40 mph.")
 
 
 def test_prevailing_period_ends():

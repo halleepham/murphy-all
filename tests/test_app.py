@@ -210,7 +210,7 @@ def test_similar_past_days_for_a_trip(past_client):
     d = past_client.get("/api/pastdays", params={"flight_id": "high"}).json()
     assert d["status"] == "ok" and d["answer"]["days"] == 10
     assert all(x["date"] < "2025-03-01" for x in d["days"])      # the trip's own day never shows
-    assert d["provenance"]["decisions"] == ["0020"] and d["uncertainty"]["thin_below"] == 0.92
+    assert d["provenance"]["decisions"] == ["0020"] and d["uncertainty"]["thin_below"] == 0.93
 
 
 def test_similar_past_days_refuses_unknown_and_says_no_weather(past_client):
