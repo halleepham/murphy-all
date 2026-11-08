@@ -31,7 +31,7 @@ QUESTIONS = {
     "chance": ("How likely is this flight to make me late?", ["flight"]),
     "better": ("Is there a better flight?", ["alternatives"]),
     "why": ("Why is this flight at risk?", ["why", "taf"]),
-    "region": ("How are other regions doing today?", ["community_day"]),
+    "region": ("How are the regions doing today?", ["community_day"]),
 }
 COMMUNITY_KEYS = {"community", "community_busiest", "co_disruption_weight"}
 
@@ -51,6 +51,7 @@ GLOSSARY = {
     "raw": "raw terminal aerodrome forecast (TAF) for the origin",
     "mean_p_miss": "average p_miss of the day's flights leaving that community, at the same lead",
     "flights_p_miss_50": "how many of those flights had p_miss of 50% or more",
+    "trip_role": "whether this community holds the traveler's origin or destination airport",
 }
 
 SYSTEM = """You explain flight-disruption evidence to a traveler.

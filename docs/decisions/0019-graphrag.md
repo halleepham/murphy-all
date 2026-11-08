@@ -128,3 +128,53 @@ the deployed app at roughly 190 answers a day (`0005`).
 all evidence first, because Aura dropped an idle connection while the run waited on Groq.
 Then mark the graph answers (supported, incomplete, overreach, wrong, right or wrong refusal) and
 have the owner check six.
+
+## Finding 3 — Three answers marked against their evidence
+
+**Marked by AI, 7 Nov 2026; owner checked and agreed.** The owner chose this over marking them personally.
+AA3104 at 24 h, graph system, run 2 (`data/graphrag/eval.jsonl`). Judged against the evidence
+only, not against what happened to the flight.
+
+| Question | Mark | Why |
+|---|---|---|
+| Basic: how likely to make me late? | **Supported** | 42% at 24 h, the right lead [E1]. Shows "p_miss" jargon to the traveler. |
+| Multi-hop: why at risk? | **Supported** | The TAF [E9] has light snow, then freezing rain with snow (4 miles) from 15Z, freezing rain and sleet (3 miles) from 18Z; the flight leaves 19:10Z. Leaves raw codes (FZRASN) unexplained. Skips the neighbors, which is right: none of their METARs shows weather (E2–E8). Does not say ATL was clear at as_of (E1). |
+| Analytics: other regions today? | **Incomplete, misleading** | Each stated number matches [E1, E2, E4]. It leaves out community 2 (DFW, the destination), the worst that day: 26% mean, 16 flights at 50% or more [E3]; and community 4 (ATL, the origin) [E5]. It may have read "other regions" as "not the trip's". |
+
+**Read:** the one miss is the question's wording, not a wrong number. **Proposed, not applied:**
+ask "How are the regions doing today?", and have code mark the trip's origin and destination
+communities in the evidence.
+
+## Proposed, not built — two more suggested questions
+
+**AI proposed, owner agreed to note them, 7 Nov 2026.** Both use data already in the graph.
+
+1. **"What changed since the last forecast?"** The chance at each lead (AA3104: 42% at 24 h, 78% at
+   6 h) and the METAR and TAF reports that arrived between the two `as_of` times. Explains a jump,
+   which is what makes a traveler trust or doubt the number. A second multi-hop query, over time.
+2. **"What's the weather at my destination?"** The `why` pattern for the arrival airport. Only 30
+   airports have weather reports, so many answers will be "no report".
+
+Left out: "has this route been bad lately?" (the graph holds 9 days; similar past airport-days is
+the planned step) and "what actually happened?" as a traveler question (hindsight; a demo only).
+**Cost to test each:** about 12 answers on the 5 cases (graph, BM25, none), about 12,000–15,000
+tokens. Run on a day with budget left: the rerun below crawled once the daily limit was near.
+
+## Finding 4 — The regions fix, rerun on 3 flights
+
+**AI applied the fix proposed in Finding 3 at the owner's request, 7 Nov 2026.** The question is now
+"How are the regions doing today?", and `community_day` labels each community `trip origin`,
+`trip destination` or both (`trip_role`). Rerun of the 5 cases (`data/graphrag/eval_run4.txt`)
+stopped by owner's choice when the daily limit slowed calls: 39 of 56 answers; WN1383 not reached.
+
+- **AA3104:** now names the origin community (ATL…, 14%, none at 50% or more [E5]) and the
+  destination community (DFW…, 26%, 16 flights [E3]). Each number matches. It now leaves out the
+  other three communities. AI mark: **supported**; it answers what the traveler needs, not all
+  of "the regions".
+- **WN1385:** all five communities, with community 3 named as the trip's origin and destination [E4].
+  **Supported.**
+- **DL1725 (2 h):** origin and destination communities only, as for AA3104. **Supported.**
+- **BM25 used hindsight in an answer.** WN1385, regions: "arrived 63.0 min late [E4]" and "WN4356
+  was cancelled [E9]", outcomes learned after the forecast. The prompt says not to use facts known
+  after `as_of`; with no time filter in retrieval, the rule alone did not hold. The graph's queries
+  never return them.

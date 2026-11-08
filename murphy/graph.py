@@ -171,9 +171,14 @@ QUERIES = {
            ORDER BY t.known_at DESC LIMIT 1"""),
     "community_day": ("Analytics: forecast risk by community on the flight's day, at the same lead",
         """MATCH (x:Flight {id: $flight_id})
+           OPTIONAL MATCH (x)-[:DEPARTS_FROM]->(:Airport)-[:IN_COMMUNITY]->(oc:Community)
+           OPTIONAL MATCH (x)-[:ARRIVES_AT]->(:Airport)-[:IN_COMMUNITY]->(dc:Community)
+           WITH x, oc.id AS o, dc.id AS d
            MATCH (f:Flight {in_replay: true, date: x.date})-[:DEPARTS_FROM]->(:Airport)-[:IN_COMMUNITY]->(c:Community)
-           WITH c, f['p_miss_' + toString($lead_h) + 'h'] AS p
-           RETURN c.id AS community, c.busiest[0..4] AS busiest, count(*) AS flights,
+           WITH c, o, d, f['p_miss_' + toString($lead_h) + 'h'] AS p
+           RETURN c.id AS community, c.busiest[0..4] AS busiest,
+                  CASE WHEN c.id = o AND c.id = d THEN 'trip origin and destination' WHEN c.id = o THEN 'trip origin'
+                       WHEN c.id = d THEN 'trip destination' END AS trip_role, count(*) AS flights,
                   avg(p) AS mean_p_miss, sum(CASE WHEN p >= 0.5 THEN 1 ELSE 0 END) AS flights_p_miss_50
            ORDER BY community"""),
     "outcome": ("Hindsight: what happened, known only after the flight",

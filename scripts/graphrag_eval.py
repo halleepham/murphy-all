@@ -1,12 +1,14 @@
 """Evaluate GraphRAG against its ablation and two baselines (docs/decisions/0019).
 
-  PYTHONPATH=. python scripts/graphrag_eval.py
+  PYTHONPATH=. python scripts/graphrag_eval.py            the 5 hand-picked cases
+  PYTHONPATH=. python scripts/graphrag_eval.py --sample   plus 27 flights picked by code (0019 Limitation)
 
 Every case asks the suggested questions four ways: graph, graph_no_comm, bm25, none.
 Code checks each answer (murphy.graphrag.check); the owner reads the answers.
 Writes data/graphrag/eval.jsonl. LLM answers are cached, so a rerun costs no calls.
 """
 import json
+import sys
 from murphy import graph as kg, graphrag as gr
 
 CASES = [  # (flight, lead_h, why it is here)
@@ -60,7 +62,7 @@ def gather():
     driver, db = kg.connect()
     jobs, rows = [], []
     with driver, driver.session(database=db) as s:
-        cases = CASES + sample(s)
+        cases = CASES + (sample(s) if "--sample" in sys.argv else [])
         print(f"{len(cases)} cases", flush=True)
         for fid, lead, note in cases:
             base = kg.ask(s, "flight", fid, lead)
