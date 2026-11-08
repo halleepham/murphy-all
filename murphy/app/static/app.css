@@ -1,0 +1,100 @@
+/* Shared look for every page. Colors, type and spacing are set once here (0023). */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --text: #16191d; --muted: #5b6370; --line: #e2e5ea;
+  --accent: #2456d6; --accent-soft: #e8eefc;
+  --good: #1d7a46; --good-soft: #e3f4ea; --warn: #9a6400; --warn-soft: #fbf0d9; --bad: #b42323; --bad-soft: #fbe5e5;
+  --radius: 10px; --gap: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418; --surface: #1a1e24; --text: #e9ecf0; --muted: #9aa3ae; --line: #2c323a;
+    --accent: #7ea2ff; --accent-soft: #1f2a44;
+    --good: #5cc98a; --good-soft: #17301f; --warn: #e6b450; --warn-soft: #33290f; --bad: #ff7b7b; --bad-soft: #3a1a1a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 var(--font); color: var(--text); background: var(--bg); }
+a { color: var(--accent); }
+h1, h2, h3 { line-height: 1.2; margin: 0; }
+input, select, button { font: inherit; color: inherit; }
+
+/* Top bar */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar .inner { max-width: 1080px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 24px; }
+.brand { font-weight: 800; font-size: 1.25rem; letter-spacing: -.02em; color: var(--text); text-decoration: none; }
+.topbar nav { margin-left: auto; display: flex; gap: 20px; }
+.topbar nav a { color: var(--muted); text-decoration: none; font-size: .95rem; }
+.topbar nav a:hover, .topbar nav a.on { color: var(--text); }
+
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.muted { color: var(--muted); }
+.small { font-size: .875rem; }
+.error { color: var(--bad); }
+
+/* Buttons and fields */
+.btn { display: inline-block; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 14px; cursor: pointer; text-decoration: none; color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-color-scheme: dark) { .btn.primary { color: #0d1420; } }
+.btn:hover { filter: brightness(.97); }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+.field input, .field select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 1rem; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 12px; font-size: .85rem; cursor: pointer; }
+.chip:hover, .chip.on { border-color: var(--accent); background: var(--accent-soft); }
+.tag { display: inline-block; font-size: .7rem; padding: 1px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); margin-left: 4px; vertical-align: 1px; }
+
+/* Landing */
+.hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; min-height: 60vh; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: -.03em; }
+.hero p.lead { font-size: 1.15rem; color: var(--muted); max-width: 32em; margin: 16px 0 24px; }
+.form-grid { display: grid; grid-template-columns: 1.4fr .7fr .9fr; gap: 12px; margin-bottom: 14px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; gap: 24px; min-height: 0; } }
+
+/* Results */
+.flight-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; }
+.flight-head .code { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+.flight-head .route { font-size: 1.2rem; font-weight: 600; }
+.flight-head .change { margin-left: auto; }
+.summary { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; margin-top: var(--gap); }
+.chance { font-size: 2.8rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.verdict { display: inline-block; font-weight: 700; padding: 6px 12px; border-radius: 8px; }
+.verdict.keep { background: var(--good-soft); color: var(--good); }
+.verdict.too_uncertain { background: var(--warn-soft); color: var(--warn); }
+.verdict.consider_changing, .verdict.at_risk_no_better_flight, .verdict.cancelled { background: var(--bad-soft); color: var(--bad); }
+.controls { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 760px) { .summary { grid-template-columns: 1fr; gap: 12px; } }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 28px 0 0; overflow-x: auto; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.panel { padding-top: 20px; }
+.panel > * + * { margin-top: 12px; }
+
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: .8rem; }
+tr.best td { font-weight: 700; }
+.scroll { overflow-x: auto; }
+details summary { cursor: pointer; color: var(--accent); }
+ul.evidence { padding-left: 18px; font-size: .85rem; word-break: break-word; }
+ul.evidence li + li { margin-top: 6px; }
+blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); }
+/* Results page: content on the left, Ask sidebar on the right */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; max-width: 1280px; }
+.assistant { position: sticky; top: 16px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 10px; }
+.assistant h2 { font-size: 1.05rem; }
+.assistant p { margin: 0; }
+.chat { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.chat:empty { display: none; }
+.msg { padding: 8px 12px; border-radius: 10px; font-size: .9rem; }
+.msg p { margin: 0 0 6px; }
+.msg.you { align-self: flex-end; background: var(--accent-soft); max-width: 85%; }
+.msg.bot { background: var(--bg); border: 1px solid var(--line); }
+.assistant .examples .chip { text-align: left; }
+@media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .assistant { position: static; max-height: none; } }
+.prose { max-width: 42em; }
+.prose h2 { margin: 28px 0 8px; font-size: 1.2rem; }

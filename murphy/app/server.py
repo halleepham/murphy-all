@@ -9,6 +9,7 @@ import duckdb
 import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from murphy.cost import estimated_fare
 from murphy import policies as pol
@@ -122,9 +123,19 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
     past_index = past_index or pastdays_index()
     policy_ix = policy_ix or policy_index()
 
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
     @app.get("/")
-    def page():
+    def landing():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/trip")
+    def trip_page():
+        return FileResponse(STATIC / "trip.html")
+
+    @app.get("/about")
+    def about_page():
+        return FileResponse(STATIC / "about.html")
 
     @app.get("/api/flights")
     def flights(date: str, carrier: str, number: int):

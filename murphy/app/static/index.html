@@ -4,217 +4,42 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>murphy</title>
-<style>
-  body { font: 16px/1.45 system-ui, sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; color: #1c1c1c; background: #fff; }
-  h1 { margin: 0; } h2 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
-  label { display: inline-block; margin: 0 12px 8px 0; font-size: .9rem; }
-  input, select, button { font: inherit; padding: 4px 6px; }
-  .verdict { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0; }
-  .scroll { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
-  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #ddd; white-space: nowrap; }
-  tr.best { font-weight: 700; }
-  .muted, .note { color: #555; font-size: .88rem; }
-  .error { color: #a00; }
-  ul { padding-left: 20px; }
-  button.link { background: none; border: 0; padding: 0; color: #0645ad; text-decoration: underline; cursor: pointer; }
-  .questions button { margin: 0 8px 8px 0; }
-  .evidence li { font-size: .85rem; word-break: break-word; }
-  .questions button.on { font-weight: bold; }
-  blockquote { margin: 4px 0 4px 12px; padding-left: 8px; border-left: 3px solid #ccc; }
-</style>
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<h1>murphy</h1>
-<p class="muted">Will your flight get you there by your deadline? A replay of 2025 flights. You decide.</p>
+<header class="topbar"><div class="inner">
+  <a class="brand" href="/">murphy</a>
+  <nav><a href="/about">About</a></nav>
+</div></header>
 
-<form id="find">
-  <label>Date <input id="date" type="date" min="2025-01-01" max="2025-12-31" required></label>
-  <label>Airline <input id="carrier" size="3" maxlength="2" placeholder="DL" required></label>
-  <label>Flight <input id="number" type="number" min="1" placeholder="1222" required></label>
-  <button>Find</button>
-</form>
-<div id="found"></div>
-<p class="muted">Or try a high-risk flight: <span id="examples"></span></p>
-<p class="note">The first three are from 4 to 12 January 2025, where you can also ask questions about the flight.</p>
+<main class="hero">
+  <section>
+    <!-- Headline and description are placeholders until the design pass (0023). -->
+    <h1>Will your flight get you there in time?</h1>
+    <p class="lead">murphy forecasts the chance your flight lands by your deadline, says whether to keep it, and shows better flights with the evidence behind each answer.</p>
+    <a class="btn" href="/about">About</a>
+  </section>
 
-<div id="controls" hidden>
-  <label>Forecast made <select id="lead"><option value="24">24 h before</option><option value="6">6 h before</option><option value="2" selected>2 h before</option></select></label>
-  <label>Deadline after scheduled arrival <select id="deadline"><option>30</option><option selected>60</option><option>120</option></select> min</label>
-  <label>Could leave up to <input id="earlier" type="number" min="0" max="24" step="1" value="2" style="width:3.5em"> h earlier</label>
-  <label>Sort by <select id="sort"><option value="chance">chance of making it</option><option value="price">estimated price</option></select></label>
-</div>
-<div id="result"></div>
+  <section class="card">
+    <h2 style="font-size:1.1rem;margin-bottom:14px">Check a flight</h2>
+    <form id="find">
+      <div class="form-grid">
+        <label class="field">Date <input id="date" type="date" min="2025-01-01" max="2025-12-31" required></label>
+        <label class="field">Airline <input id="carrier" maxlength="2" placeholder="DL" required></label>
+        <label class="field">Flight <input id="number" type="number" min="1" placeholder="1222" required></label>
+      </div>
+      <button class="btn primary" style="width:100%">Check flight</button>
+    </form>
+    <div id="found" style="margin-top:12px"></div>
+    <p class="muted small" style="margin:18px 0 0">Or try an example</p>
+    <div class="examples" id="examples"></div>
+    <p class="muted small" style="margin-top:14px">A replay of 2025 flights.</p>
+  </section>
+</main>
 
+<script src="/static/common.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
-const pct = x => (100 * x).toFixed(0) + "%";
-const time = t => t ? t.slice(0, 2) + ":" + t.slice(2) : "?";
-const WORDS = {
-  keep: "Keep your flight",
-  too_uncertain: "Too uncertain to say",
-  consider_changing: "Consider changing",
-  at_risk_no_better_flight: "High risk, but no flight is clearly better",
-  cancelled: "This flight is already known to be cancelled",
-};
-let current = null;
-const QUESTIONS = [  // murphy.graphrag.QUESTIONS (0019)
-  ["chance", "How likely is this flight to make me late?"],
-  ["better", "Is there a better flight?"],
-  ["why", "Why is this flight at risk?"],
-  ["region", "How are the regions doing today?"],
-];
-const STATUS = {
-  not_in_graph: "Questions cover flights from 4 to 12 January 2025 only.",
-  no_evidence: "The knowledge graph holds nothing for this question, so there is nothing to explain.",
-  paused: "Explanations are paused: the language model's free daily limit is reached. The evidence below comes straight from the knowledge graph.",
-};
-
-function show(v) { return Array.isArray(v) ? v.map(x => typeof x === "object" ? JSON.stringify(x) : x).join(", ") : v; }
-
-async function ask(key, box) {
-  box.replaceChildren(el("p", "Looking in the knowledge graph...", "muted"));
-  const q = new URLSearchParams({ flight_id: current, question: key, lead_h: $("lead").value, deadline_min: $("deadline").value, max_earlier_h: $("earlier").value });
-  let d;
-  try { d = await get("/api/ask?" + q); } catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
-  const out = [el("p", d.question, "muted")];
-  out.push(el("p", d.explanation || STATUS[d.status]));
-  if (d.checks && d.checks.invented.length) out.push(el("p", "Check: these numbers are not in the evidence: " + d.checks.invented.join(", "), "error"));
-  if (d.checks && d.checks.bad_tags.length) out.push(el("p", "Check: it cites evidence that does not exist: " + d.checks.bad_tags.join(", "), "error"));
-  if (d.evidence.length) {
-    const det = el("details"), ul = el("ul", null, "evidence");
-    det.append(el("summary", `See the evidence (${d.evidence.length} rows)`));
-    d.evidence.forEach(r => ul.append(el("li", `[${r.tag}] ${r.query}: ` + Object.entries(r).filter(([k]) => k !== "tag" && k !== "query").map(([k, v]) => `${k} ${show(v)}`).join("; "))));
-    det.append(ul);
-    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number. Decision records: ${d.provenance.decisions.join(", ")}.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""}`, "note"));
-    out.push(det);
-  }
-  box.replaceChildren(...out);
-}
-
-async function pastDays(origin, box) {  // 0020: all departures that day, not this flight
-  box.replaceChildren(el("p", "Looking for similar past days...", "muted"));
-  let d;
-  try { d = await get("/api/pastdays?" + new URLSearchParams({ flight_id: current, lead_h: $("lead").value })); }
-  catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
-  const out = [], a = d.answer, u = d.uncertainty;
-  if (d.status === "no_weather") out.push(el("p", `No weather data for ${origin}. Similar past days cover the 30 busiest airports.`, "muted"));
-  else if (a) out.push(el("p", `On the ${a.days} past days at ${origin} whose forecast looked most like this one, on average ${pct(a.late_share)} of departures left 15+ minutes late or were cancelled (range ${pct(a.range[0])} to ${pct(a.range[1])}). This is every departure from ${origin} that day, not your flight.`));
-  else out.push(el("p", `${u.reason} Not enough evidence, so no percent is shown.`, "muted"));
-  if (d.query) {
-    const det = el("details"), ul = el("ul", null, "evidence");
-    det.append(el("summary", `See the days (${d.days.length})`));
-    det.append(el("p", `This day's forecast: ${d.query.text}`, "note"));
-    d.days.forEach(x => ul.append(el("li", `${x.date}: ${pct(x.late_share)} late or cancelled (${x.n_late} of ${x.n_dep}), similarity ${x.similarity.toFixed(3)}. ${x.text}`)));
-    det.append(ul);
-    det.append(el("p", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}. Mean similarity ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`, "note"));
-    out.push(det);
-  }
-  box.replaceChildren(...out);
-}
-
-const SITUATIONS = [  // murphy.policies.SITUATIONS (0021)
-  ["cancelled", "My flight is cancelled"], ["delay_refund", "Long delay: I no longer want to go"],
-  ["delay_care", "Long delay: hotel or meals"], ["schedule_change", "The airline changed my flight time"],
-  ["change_myself", "I want to switch flights myself"], ["missed_connection", "I missed my connection"],
-  ["tarmac", "Stuck on the plane on the ground"], ["bumped", "Bumped from an oversold flight"],
-];
-
-async function policies(key, box, buttons) {  // 0021: quoted as written, no LLM
-  buttons.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.key === key));
-  box.replaceChildren(el("p", "Looking in the rules...", "muted"));
-  let d;
-  try { d = await get("/api/policies?" + new URLSearchParams({ flight_id: current, situation: key })); }
-  catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
-  const out = [el("p", `Searched: "${d.answer.question}"`, "muted")];
-  if (d.note) out.push(el("p", d.note, "muted"));
-  const ul = el("ul", null, "evidence");
-  d.passages.forEach(x => {
-    const li = el("li"), a = el("a", `${x.section} (part ${x.part})`);
-    a.href = x.url; a.target = "_blank"; a.rel = "noopener";
-    li.append(a, el("blockquote", x.text), el("span", `${x.id}, collected ${x.collected}, file hash ${x.sha256}, similarity ${x.score.toFixed(3)}`, "note"));
-    ul.append(li);
-  });
-  out.push(ul);
-  out.push(el("p", `${d.provenance.method}. ${d.uncertainty.retrieval} ${d.uncertainty.terms} Decision record ${d.provenance.decisions.join(", ")}.`, "note"));
-  box.replaceChildren(...out);
-}
-
-async function get(url) {
-  const r = await fetch(url);
-  const body = await r.json();
-  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request failed");
-  return body;
-}
-
-function table(headers, rows) {
-  const wrap = el("div", null, "scroll"), t = el("table"), head = el("tr");
-  headers.forEach(h => head.append(el("th", h)));
-  t.append(head);
-  rows.forEach(r => { const tr = el("tr", null, r.cls); r.cells.forEach(c => tr.append(el("td", c))); t.append(tr); });
-  wrap.append(t);
-  return wrap;
-}
-
-function choose(flightId) { current = flightId; $("controls").hidden = false; load(); }
-
-async function load() {
-  const out = $("result");
-  const q = new URLSearchParams({ flight_id: current, lead_h: $("lead").value, deadline_min: $("deadline").value, max_earlier_h: $("earlier").value, sort: $("sort").value });
-  try { render(await get("/api/trip?" + q)); }
-  catch (e) { out.replaceChildren(el("p", e.message, "error")); }
-}
-
-function render(d) {
-  const f = d.flight, a = d.answer, t = d.uncertainty.track_record, p = d.provenance, out = [];
-  out.push(el("p", WORDS[a.verdict], "verdict"));
-  out.push(el("p", `${f.flight}, ${f.origin} to ${f.dest}, ${f.date}, ${time(f.departs_local)} to ${time(f.arrives_local)} local. Chance of making your deadline: ${pct(a.chance)}.`));
-
-  out.push(el("h2", "How forecasts like this have done"));
-  out.push(el("p", `On 2025, ${t.forecasts.toLocaleString("en-US")} forecasts in this risk band predicted a ${pct(t.predicted_miss)} chance of missing on average. ${pct(t.true_miss)} really missed.`));
-
-  const past = el("div");
-  out.push(el("h2", `Similar past days at ${f.origin}`), past);
-  pastDays(f.origin, past);
-
-  out.push(el("h2", "What the rules say"));
-  const sits = el("div", null, "questions"), rules = el("div");
-  SITUATIONS.forEach(([key, text]) => { const b = el("button", text); b.type = "button"; b.dataset.key = key; b.onclick = () => policies(key, rules, sits); sits.append(b); });
-  out.push(sits, rules);
-  policies(d.policy_situation, rules, sits);
-
-  if (a.verdict !== "keep") {
-    out.push(el("h2", `Alternatives (${d.alternatives.length})`));
-    if (d.alternatives.length) {
-      out.push(table(["", "Flight", "Departs", "Arrives", "Chance", "Gain", "Estimated new ticket"], d.alternatives.map(x => ({
-        cls: x.best ? "best" : "",
-        cells: [x.best ? "Best" : "", x.flight, `${x.date} ${time(x.departs_local)}`, time(x.arrives_local), pct(x.chance), (x.gain >= 0 ? "+" : "") + (100 * x.gain).toFixed(0) + " pts",
-                x.cost.fare == null ? "No estimate" : "$" + x.cost.fare.toFixed(2) + (x.same_airline ? " *" : "")],
-      }))));
-      out.push(el("p", "Estimated new ticket: the median fare people paid on this route and airline (or route, if the airline has too little data), from " + d.alternatives[0].cost.source + ". Flights on one airline show the same figure, so sorting by price compares airlines, not departure times.", "note"));
-      if (d.alternatives.some(x => x.same_airline)) out.push(el("p", "* Same airline: this may cost only a fare difference, which the data does not show.", "note"));
-    } else out.push(el("p", "No flight leaves within your limits and arrives by the deadline.", "muted"));
-  }
-
-  out.push(el("h2", "Ask about this flight"));
-  if (!d.askable) out.push(el("p", STATUS.not_in_graph, "muted"));
-  else if ($("deadline").value !== "60") out.push(el("p", "Questions use a 60-minute deadline. Set the deadline to 60 to ask.", "muted"));
-  else {
-    const qs = el("div", null, "questions"), answer = el("div");
-    QUESTIONS.forEach(([key, text]) => { const b = el("button", text); b.type = "button"; b.onclick = () => ask(key, answer); qs.append(b); });
-    out.push(qs, answer);
-  }
-
-  out.push(el("h2", "Where this came from"));
-  out.push(el("p", `Model ${p.model}, forecast as of ${p.forecast_as_of_utc} UTC (${p.lead_h} h before departure). ${p.data}. Flight record ${f.flight_id}. Decision records: ${p.decisions.join(", ")}.`, "note"));
-
-  out.push(el("h2", "Limits"));
-  const ul = el("ul", null, "note");
-  d.uncertainty.limits.forEach(x => ul.append(el("li", x)));
-  out.push(ul);
-  $("result").replaceChildren(...out);
-}
+const go = id => { location.href = "/trip?flight_id=" + encodeURIComponent(id); };
 
 $("find").addEventListener("submit", async e => {
   e.preventDefault();
@@ -222,20 +47,26 @@ $("find").addEventListener("submit", async e => {
   const box = $("found");
   try {
     const rows = await get("/api/flights?" + q);
-    if (!rows.length) { box.replaceChildren(el("p", "No forecast for this flight. Forecasts cover sampled 2025 flights only.", "error")); return; }
-    if (rows.length === 1) { box.replaceChildren(); choose(rows[0].flight_id); return; }
-    box.replaceChildren(...rows.map(r => { const b = el("button", `${r.origin} to ${r.dest}, ${time(r.crs_dep_local)}`); b.type = "button"; b.onclick = () => choose(r.flight_id); return b; }));
-  } catch (err) { box.replaceChildren(el("p", err.message, "error")); }
+    if (!rows.length) { box.replaceChildren(el("p", "No forecast for this flight. Forecasts cover sampled 2025 flights only.", "error small")); return; }
+    if (rows.length === 1) { go(rows[0].flight_id); return; }
+    // One flight number can fly several legs in a day: let the traveler pick.
+    box.replaceChildren(el("p", "This flight number flies more than one leg that day:", "muted small"),
+      ...rows.map(r => { const b = el("button", `${r.origin} → ${r.dest}, ${time(r.crs_dep_local)}`, "chip"); b.type = "button"; b.onclick = () => go(r.flight_id); return b; }));
+  } catch (err) { box.replaceChildren(el("p", err.message, "error small")); }
 });
-const linked = new URLSearchParams(location.search).get("flight_id");
-if (linked) choose(linked);
-["lead", "deadline", "earlier", "sort"].forEach(id => $(id).addEventListener("change", load));
 
-get("/api/examples").then(rows => $("examples").replaceChildren(...rows.flatMap(r => {
-  const b = el("button", `${r.flight} ${r.origin}-${r.dest} ${r.date}`, "link");
-  b.type = "button"; b.onclick = () => choose(r.flight_id);
-  return [b, document.createTextNode("  ")];
-})));
+// Examples fill the form; the traveler still presses the button.
+get("/api/examples").then(rows => $("examples").replaceChildren(...rows.map(r => {
+  const b = el("button", `${r.flight} · ${r.origin}→${r.dest} · ${r.date}`, "chip");
+  if (r.askable) { const t = el("span", "Q&A", "tag"); t.title = "You can ask questions about flights from 4 to 12 January 2025."; b.append(t); }
+  b.type = "button";
+  b.onclick = () => {
+    const [carrier, number] = r.flight.split(" ");
+    $("date").value = r.date; $("carrier").value = carrier; $("number").value = number;
+    $("examples").querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c === b));
+  };
+  return b;
+}))).catch(() => {});
 </script>
 </body>
 </html>

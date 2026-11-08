@@ -263,3 +263,18 @@ def test_policies_refuse_unknown_situation_flight_and_missing_index(pol_client, 
 def test_the_default_situation_follows_the_advice(client):
     assert get(client, "gone").json()["policy_situation"] == "cancelled"
     assert get(client, "low").json()["policy_situation"] == "delay_refund"
+
+
+def test_the_three_pages_and_shared_files_are_served(client):  # 0023
+    for path, marker in [("/", 'id="find"'), ("/trip", 'id="assistant"'), ("/about", "About murphy")]:
+        r = client.get(path)
+        assert r.status_code == 200 and marker in r.text and 'class="topbar"' in r.text
+    assert "--accent" in client.get("/static/app.css").text
+    assert "async function get" in client.get("/static/common.js").text
+    assert client.get("/static/missing.js").status_code == 404
+
+
+def test_the_about_page_states_every_limit_the_app_has(client):  # 0023: limits moved off the trip page
+    from murphy.app.server import LIMITS
+    about = client.get("/about").text
+    assert all(x in about for x in LIMITS)

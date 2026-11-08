@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>murphy · about</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar"><div class="inner">
+  <a class="brand" href="/">murphy</a>
+  <nav><a href="/">Check a flight</a><a href="/about" class="on">About</a></nav>
+</div></header>
+
+<!-- Outline from the owner (0023 Decision 5). Text is a first draft; the full version, and the
+     poster diagrams, come in the design pass. -->
+<main class="prose">
+  <h1>About murphy</h1>
+  <p class="muted">A CS 5542 Big Data Analytics &amp; Applications project by Hallee Pham.</p>
+
+  <h2>What murphy does</h2>
+  <p>You enter a flight and how late you can afford to arrive. murphy gives the chance you make it, whether to keep the flight, and better flights if there are any, with the evidence behind each answer.</p>
+
+  <h2>Why "murphy"</h2>
+  <p class="muted">To be written by the owner.</p>
+
+  <h2>How it works</h2>
+  <p>Code and models compute every number. Retrieval finds similar past days and the airline's rules. A knowledge graph links flights, airports and weather. A language model only explains the results, and a check flags any number it states that is not in the evidence.</p>
+  <p class="muted small">Diagrams from the poster will go here.</p>
+
+  <h2>Data sources</h2>
+  <ul>
+    <li>Flights: BTS On-Time Performance.</li>
+    <li>Fares: BTS DB1B Market, 2025 Q2.</li>
+    <li>Weather: Iowa Environmental Mesonet (IEM) ASOS observations and TAF forecasts as issued.</li>
+    <li>Rules: 14 CFR parts 250, 259 and 260 (eCFR), and the Delta and Southwest contracts of carriage.</li>
+  </ul>
+
+  <h2>Limitations</h2>
+  <!-- Kept word for word in step with LIMITS in murphy/app/server.py; a test checks it. -->
+  <ul id="limits">
+    <li>Replay of 2025 only. Forecasts exist for sampled flights at 24, 6 and 2 hours before departure.</li>
+    <li>Murphy can rarely warn about flights later swapped or cancelled.</li>
+    <li>Past schedules show that a flight existed, not that it had a seat.</li>
+    <li>Estimated costs are what people typically paid, not a quote. A last-minute seat may cost more.</li>
+    <li>Questions in the Ask panel cover flights from 4 to 12 January 2025 only, at a 60-minute deadline.</li>
+  </ul>
+
+  <p style="margin-top:28px"><a class="btn primary" href="/">Check a flight</a></p>
+</main>
+</body>
+</html>
