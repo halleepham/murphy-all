@@ -161,7 +161,11 @@ random days on 2025. Embeddings tie BM25 and plain numbers; all beat the average
 evidence beside the forecast.
 *Built (`0021`):* policy passages from 14 CFR 250, 259, 260 and the Delta and Southwest contracts
 of carriage, quoted beside the trip for eight situations. Embeddings beat BM25 on 16 pairs, not
-significantly. Next: the GCN ranking demo (`0017` Decision 4).
+significantly.
+*Built (`0022`):* the GCN ranking demo. Ordering the `why` query's neighbors by GCN score finds the
+airports that go bad next far better than today's link-weight order, which is no better than random.
+The GCN without edges ranks slightly better still. In the app behind `MURPHY_GCN_RANK=1`, off
+until the `why` answers are rerun on a Groq day.
 
 ### 6. GenAI.
 

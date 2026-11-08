@@ -33,7 +33,14 @@ QUESTIONS = {
     "why": ("Why is this flight at risk?", ["why", "taf"]),
     "region": ("How are the regions doing today?", ["community_day"]),
 }
-COMMUNITY_KEYS = {"community", "community_busiest", "co_disruption_weight"}
+COMMUNITY_KEYS = {"community", "community_busiest", "co_disruption_weight", "gcn_late_share_next3h"}
+GCN_TOP = 3  # neighbors kept when the GCN orders them (0022)
+
+
+def gcn_rank_on() -> bool:
+    """0022 Decision 6: off unless MURPHY_GCN_RANK=1, so cached answers stay valid until the `why`
+    answers are rerun. Changing the evidence changes the cache key, and the app would call Groq."""
+    return os.environ.get("MURPHY_GCN_RANK") == "1"
 
 # What each evidence field means, sent with the evidence (0019 Finding 1: without it the LLM read
 # a fixed 2023-24 link weight as today's risk, and mixed up the trip's and the alternatives' chances).
@@ -52,6 +59,9 @@ GLOSSARY = {
     "mean_p_miss": "average p_miss of the day's flights leaving that community, at the same lead",
     "flights_p_miss_50": "how many of those flights had p_miss of 50% or more",
     "trip_role": "whether this community holds the traveler's origin or destination airport",
+    "gcn_late_share_next3h": "a model's forecast, made at as_of, of the share of this airport's departures in "
+                             "the next 3 hours that leave 15+ min late or are cancelled. Used to pick which "
+                             "neighbors to show",
 }
 
 SYSTEM = """You explain flight-disruption evidence to a traveler.
@@ -72,7 +82,7 @@ def fmt(v, key=""):
     if isinstance(v, list):
         return [fmt(x, key) for x in v]
     if isinstance(v, float):
-        return f"{round(100 * v)}%" if "p_miss" in key else round(v, 3)
+        return f"{round(100 * v)}%" if "p_miss" in key or key.startswith("gcn_") else round(v, 3)
     if hasattr(v, "iso_format"):  # neo4j DateTime
         return v.iso_format()[:16] + "Z"
     return v
@@ -85,7 +95,10 @@ def evidence(session, key: str, flight_id: str, lead_h: int, communities=True, m
     for q in QUESTIONS[key][1]:
         if q == "community_day" and not communities:
             continue
-        for row in kg.ask(session, q, flight_id, lead_h, max_earlier_h):
+        rows = kg.ask(session, q, flight_id, lead_h, max_earlier_h)
+        if q == "why" and communities and gcn_rank_on():
+            rows = gcn_neighbors(rows)
+        for row in rows:
             if q == "why" and row.get("co_disruption_weight") is not None and row.get("metar_id") is None:
                 continue
             if not communities:
@@ -94,6 +107,27 @@ def evidence(session, key: str, flight_id: str, lead_h: int, communities=True, m
                 row = {k: v for k, v in row.items() if k not in COMMUNITY_KEYS}
             out.append({"tag": f"E{len(out) + 1}", "query": q, **fmt(row)})
     return out
+
+
+def gcn_neighbors(rows: list[dict], top: int = GCN_TOP) -> list[dict]:
+    """0022: the origin's own row, then the `top` neighbors with weather, highest GCN score first.
+    Neighbors with no score follow those with one. Without the score files, rows are unchanged."""
+    from murphy.forecast import rank
+    if rank.gcn_scores() is None:
+        return rows
+    own = [r for r in rows if r.get("co_disruption_weight") is None]
+    nb = [dict(r) for r in rows if r.get("co_disruption_weight") is not None and r.get("metar_id") is not None]
+    for r in nb:
+        r["gcn_late_share_next3h"] = rank.gcn_lookup(r["airport"], r.get("as_of"))
+    key = lambda r: -r["gcn_late_share_next3h"] if r["gcn_late_share_next3h"] is not None else float("inf")
+    return own + sorted(nb, key=key)[:top]  # sorted is stable: ties and unscored keep link-weight order
+
+
+def neighbor_order() -> str:
+    from murphy.forecast import rank
+    if gcn_rank_on() and rank.gcn_scores() is not None:
+        return f"GCN next-3-hour late share at as_of, top {GCN_TOP} (0022)"
+    return "co-disruption link weight, all with weather (0018)"
 
 
 def as_text(ev: list[dict]) -> str:
@@ -155,6 +189,8 @@ def answer(session, key: str, flight_id: str, lead_h: int, max_earlier_h: float)
     out = {"question": question, "evidence": [], "explanation": None, "checks": None,
            "provenance": {"queries": QUESTIONS[key][1], "llm": MODEL, "graph": "Neo4j, flights 4-12 Jan 2025 (0018)",
                           "decisions": ["0018", "0019"]}}
+    if key == "why":
+        out["provenance"]["neighbor_order"] = neighbor_order()
     if not kg.ask(session, "flight", flight_id, lead_h):
         out["status"] = "not_in_graph"
         return out

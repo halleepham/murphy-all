@@ -87,7 +87,7 @@ async function ask(key, box) {
     det.append(el("summary", `See the evidence (${d.evidence.length} rows)`));
     d.evidence.forEach(r => ul.append(el("li", `[${r.tag}] ${r.query}: ` + Object.entries(r).filter(([k]) => k !== "tag" && k !== "query").map(([k, v]) => `${k} ${show(v)}`).join("; "))));
     det.append(ul);
-    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number. Decision records: ${d.provenance.decisions.join(", ")}.`, "note"));
+    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number. Decision records: ${d.provenance.decisions.join(", ")}.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""}`, "note"));
     out.push(det);
   }
   box.replaceChildren(...out);
