@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from murphy.cost import estimated_fare
+from murphy import policies as pol
 from murphy.graph import DEADLINE_MIN as GRAPH_DEADLINE_MIN  # the graph's chances use this deadline
 from murphy.graph import WINDOW as GRAPH_WINDOW  # the dates the questions cover
 from murphy.forecast.sample import ROOT
@@ -65,6 +66,7 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
                        "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local},
             "alternatives": alts,
             "askable": GRAPH_WINDOW[0] <= str(t.flight_date)[:10] <= GRAPH_WINDOW[1],
+            "policy_situation": pol.DEFAULT_SITUATION[v],
             "provenance": {"model": MODEL, "forecast_as_of_utc": str(t.as_of_utc), "lead_h": int(t.lead_h),
                            "data": "BTS On-Time Performance 2025; IEM weather", "decisions": ["0014", "0015", "0016", "0017"]},
             "uncertainty": {"track_record": {"band": band, "forecasts": int(track.forecasts),
@@ -97,13 +99,28 @@ def pastdays_index():
     return index
 
 
-def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=None) -> FastAPI:
+def policy_index():
+    """Loads the policy passages (0021) on first use; None if they are not built here."""
+    state = {}
+    def index():
+        if "ix" not in state:
+            import pandas as pd
+            if not (pol.OUT / "passages.parquet").exists():
+                return None
+            state["ix"] = pol.Index(pd.read_parquet(pol.OUT / "passages.parquet"), np.load(pol.OUT / "embed.npy"))
+        return state["ix"]
+    return index
+
+
+def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=None, policy_ix=None) -> FastAPI:
     """graph_session: a function returning a Neo4j session (a fake one in tests).
-    past_index, taf_as_of: the similar-past-days index and TAF lookup (fakes in tests)."""
+    past_index, taf_as_of: the similar-past-days index and TAF lookup (fakes in tests).
+    policy_ix: the policy-passage index (a fake in tests)."""
     app = FastAPI(title="murphy")
     con = duckdb.connect(str(db), read_only=True)
     graph_session = graph_session or neo4j_sessions()
     past_index = past_index or pastdays_index()
+    policy_ix = policy_ix or policy_index()
 
     @app.get("/")
     def page():
@@ -158,6 +175,30 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
         tz = pd.read_parquet(ROOT / "data" / "airports.parquet").set_index("airport").tz.get(t.origin)
         return pdays.similar(ix, t.origin, pd.Timestamp(t.flight_date).date(), pd.Timestamp(t.as_of_utc).to_pydatetime(),
                              tz, taf_as_of)
+
+    @app.get("/api/policies")
+    def policies(flight_id: str, situation: str):
+        """Policy passages for the trip's airline and a situation, quoted as written (0021). No LLM."""
+        if situation not in pol.SITUATIONS:
+            raise HTTPException(422, f"situation must be one of {sorted(pol.SITUATIONS)}")
+        t = con.cursor().execute("SELECT carrier FROM trips WHERE flight_id = ? LIMIT 1", [flight_id]).df()
+        if t.empty:
+            raise HTTPException(404, "No forecast for this flight.")
+        ix = policy_ix()
+        if ix is None:
+            raise HTTPException(503, "Policy passages are not built on this machine.")
+        label, question = pol.SITUATIONS[situation]
+        r = ix.search(question, t.carrier.iloc[0], "embed")
+        keep = ("id", "carrier", "section", "part", "text", "url", "collected", "score")
+        return {"answer": {"situation": situation, "label": label, "question": question, "carrier": r["carrier"]},
+                "passages": [{k: x[k] for k in keep} | {"sha256": x["sha256"][:12]} for x in r["passages"]],
+                "note": r["note"],
+                "provenance": {"method": f"{pol.MODEL} cosine, top {pol.K}, over the airline's contract of carriage "
+                                         "and 14 CFR parts 250, 259 and 260",
+                               "decisions": ["0021"]},
+                "uncertainty": {"retrieval": "Tested on 16 situation and airline pairs: a correct passage was in the "
+                                             "top 3 for 13 (0021 Finding 1).",
+                                "terms": "Quoted from the source as collected; the airline's current terms may differ."}}
 
     @app.get("/api/ask")
     def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,

@@ -211,3 +211,55 @@ def test_similar_past_days_for_a_trip(past_client):
 def test_similar_past_days_refuses_unknown_and_says_no_weather(past_client):
     assert past_client.get("/api/pastdays", params={"flight_id": "nope"}).status_code == 404
     assert past_client.get("/api/pastdays", params={"flight_id": "far"}).json()["status"] == "no_weather"
+
+
+class FakePolicies:
+    """Stands in for murphy.policies.Index: records what was searched."""
+    def __init__(self):
+        self.calls = []
+
+    def search(self, question, carrier, method="embed", k=3):
+        from murphy.policies import CONTRACTS
+        self.calls.append((question, carrier, method))
+        p = {"id": "x:0001", "carrier": "federal", "section": "14 CFR 260.6 Refunds.", "part": "1/1", "text": "Refund it.",
+             "url": "https://example.test", "collected": "2026-11-07", "sha256": "ab" * 32, "score": 0.8}
+        return {"carrier": carrier, "note": None if carrier in CONTRACTS else f"{carrier}: federal rules only.", "passages": [p]}
+
+
+@pytest.fixture
+def pol_client(tmp_path):
+    path = tmp_path / "pol.duckdb"
+    con = duckdb.connect(str(path))
+    trips = pd.DataFrame([trip("dl", .2), trip("ua", .2) | {"carrier": "UA"}])
+    con.execute("CREATE TABLE trips AS SELECT * FROM trips")
+    con.close()
+    fake = FakePolicies()
+    return TestClient(create_app(path, policy_ix=lambda: fake)), fake
+
+
+def test_policies_search_the_trips_airline_and_trace_the_source(pol_client):
+    c, fake = pol_client
+    d = c.get("/api/policies", params={"flight_id": "dl", "situation": "cancelled"}).json()
+    assert fake.calls[-1][1:] == ("DL", "embed") and "cancelled my flight" in fake.calls[-1][0]
+    x = d["passages"][0]
+    assert x["section"] and x["url"] and x["collected"] and x["sha256"] == "ab" * 6
+    assert d["note"] is None and d["provenance"]["decisions"] == ["0021"]
+
+
+def test_policies_for_an_airline_not_collected_say_so(pol_client):  # thin evidence
+    c, _ = pol_client
+    assert "federal rules only" in c.get("/api/policies", params={"flight_id": "ua", "situation": "tarmac"}).json()["note"]
+
+
+def test_policies_refuse_unknown_situation_flight_and_missing_index(pol_client, tmp_path):
+    c, _ = pol_client
+    assert c.get("/api/policies", params={"flight_id": "dl", "situation": "weather"}).status_code == 422
+    assert c.get("/api/policies", params={"flight_id": "nope", "situation": "cancelled"}).status_code == 404
+    path = tmp_path / "pol.duckdb"
+    assert TestClient(create_app(path, policy_ix=lambda: None)).get(
+        "/api/policies", params={"flight_id": "dl", "situation": "cancelled"}).status_code == 503
+
+
+def test_the_default_situation_follows_the_advice(client):
+    assert get(client, "gone").json()["policy_situation"] == "cancelled"
+    assert get(client, "low").json()["policy_situation"] == "delay_refund"

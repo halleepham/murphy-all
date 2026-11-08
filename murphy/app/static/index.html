@@ -20,6 +20,8 @@
   button.link { background: none; border: 0; padding: 0; color: #0645ad; text-decoration: underline; cursor: pointer; }
   .questions button { margin: 0 8px 8px 0; }
   .evidence li { font-size: .85rem; word-break: break-word; }
+  .questions button.on { font-weight: bold; }
+  blockquote { margin: 4px 0 4px 12px; padding-left: 8px; border-left: 3px solid #ccc; }
 </style>
 </head>
 <body>
@@ -112,6 +114,33 @@ async function pastDays(origin, box) {  // 0020: all departures that day, not th
   box.replaceChildren(...out);
 }
 
+const SITUATIONS = [  // murphy.policies.SITUATIONS (0021)
+  ["cancelled", "My flight is cancelled"], ["delay_refund", "Long delay: I no longer want to go"],
+  ["delay_care", "Long delay: hotel or meals"], ["schedule_change", "The airline changed my flight time"],
+  ["change_myself", "I want to switch flights myself"], ["missed_connection", "I missed my connection"],
+  ["tarmac", "Stuck on the plane on the ground"], ["bumped", "Bumped from an oversold flight"],
+];
+
+async function policies(key, box, buttons) {  // 0021: quoted as written, no LLM
+  buttons.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.key === key));
+  box.replaceChildren(el("p", "Looking in the rules...", "muted"));
+  let d;
+  try { d = await get("/api/policies?" + new URLSearchParams({ flight_id: current, situation: key })); }
+  catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
+  const out = [el("p", `Searched: "${d.answer.question}"`, "muted")];
+  if (d.note) out.push(el("p", d.note, "muted"));
+  const ul = el("ul", null, "evidence");
+  d.passages.forEach(x => {
+    const li = el("li"), a = el("a", `${x.section} (part ${x.part})`);
+    a.href = x.url; a.target = "_blank"; a.rel = "noopener";
+    li.append(a, el("blockquote", x.text), el("span", `${x.id}, collected ${x.collected}, file hash ${x.sha256}, similarity ${x.score.toFixed(3)}`, "note"));
+    ul.append(li);
+  });
+  out.push(ul);
+  out.push(el("p", `${d.provenance.method}. ${d.uncertainty.retrieval} ${d.uncertainty.terms} Decision record ${d.provenance.decisions.join(", ")}.`, "note"));
+  box.replaceChildren(...out);
+}
+
 async function get(url) {
   const r = await fetch(url);
   const body = await r.json();
@@ -148,6 +177,12 @@ function render(d) {
   const past = el("div");
   out.push(el("h2", `Similar past days at ${f.origin}`), past);
   pastDays(f.origin, past);
+
+  out.push(el("h2", "What the rules say"));
+  const sits = el("div", null, "questions"), rules = el("div");
+  SITUATIONS.forEach(([key, text]) => { const b = el("button", text); b.type = "button"; b.dataset.key = key; b.onclick = () => policies(key, rules, sits); sits.append(b); });
+  out.push(sits, rules);
+  policies(d.policy_situation, rules, sits);
 
   if (a.verdict !== "keep") {
     out.push(el("h2", `Alternatives (${d.alternatives.length})`));

@@ -63,7 +63,7 @@ flight, so they are stated limitations, not per-flight signals.
 | Does network information help? | With and without communities; with and without GNN | Measured on 2025 (`0017` Finding 4): small Brier gain, net about the same |
 | Are recommendations good? | No change at all; a traveler's rule of thumb (`0014`). Climatology and the schedule-only model almost never act | Measured on 2025 with `final_clean` (`0014` Finding 3) |
 | Do trust checks help? | The recommender with and without them | Not built |
-| Is retrieval good? | Vector vs BM25 | Not built |
+| Is retrieval good? | Vector vs BM25 | Past days: embeddings tie BM25 and plain numbers, all beat averages (`0020`). Policies: embeddings 13 of 16 vs BM25 8, not significant (`0021` Finding 1) |
 | Are answers grounded? | GraphRAG vs plain retrieval; every value traces to a source | First run on 4 flights (`0019` Finding 2): graph 6 of 7 key facts, BM25 5 of 7, none 0 |
 
 **Are recommendations good?** Replay real trips, assuming the traveler takes the
@@ -158,7 +158,10 @@ fixed queries.
 no retrieval on 4 flights. In the app as four questions beside the trip (`0019` Decision 3).
 *Built (`0020`):* similar past airport-days, embeddings vs BM25, plain numbers, month average and
 random days on 2025. Embeddings tie BM25 and plain numbers; all beat the averages. In the app as
-evidence beside the forecast. Policies are next.
+evidence beside the forecast.
+*Built (`0021`):* policy passages from 14 CFR 250, 259, 260 and the Delta and Southwest contracts
+of carriage, quoted beside the trip for eight situations. Embeddings beat BM25 on 16 pairs, not
+significantly. Next: the GCN ranking demo (`0017` Decision 4).
 
 ### 6. GenAI.
 

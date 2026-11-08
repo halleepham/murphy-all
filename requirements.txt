@@ -16,6 +16,9 @@
 #   retrieval  - sentence-transformers 5.7 (6.x needs torch>=2.6), BM25
 #   graphs     - networkx (communities run in Python: Aura Free has no GDS)
 #   app        - pydantic, fastapi, uvicorn, httpx (LLM calls over HTTP)
+#
+# Approved by the owner on 7 Nov 2026 (0021):
+#   policies   - pypdf, pure Python, reads Southwest's contract of carriage
 
 neo4j==6.4.1
 pytest==9.2.0
@@ -28,6 +31,7 @@ numpy==1.26.4
 pandas==3.0.6
 pyarrow==25.0.0  # 26 needs numpy>=2; torch 2.2.2 needs numpy<2
 pydantic==2.14.2
+pypdf==7.0.0
 rank-bm25==0.2.2
 scikit-learn==1.9.1
 sentence-transformers==5.7.0
