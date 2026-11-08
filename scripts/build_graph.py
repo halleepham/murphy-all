@@ -14,7 +14,7 @@ import duckdb, numpy as np, pandas as pd
 from murphy import graph as kg
 from murphy.forecast import network as nw
 
-WINDOW = ("2025-01-04", "2025-01-12")  # inclusive; two storms and calm days (0018 Decision 4)
+WINDOW = kg.WINDOW
 WEATHER_FROM, WEATHER_TO = "2025-01-03", "2025-01-13"  # 24 h before the first departure
 APP = kg.ROOT / "data" / "forecast" / "app" / "replay.duckdb"
 ROWS = kg.ROOT / "data" / "forecast" / "rows.parquet"

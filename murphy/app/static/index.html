@@ -34,6 +34,7 @@
 </form>
 <div id="found"></div>
 <p class="muted">Or try a high-risk flight: <span id="examples"></span></p>
+<p class="note">The first three are from 4 to 12 January 2025, where you can also ask questions about the flight.</p>
 
 <div id="controls" hidden>
   <label>Forecast made <select id="lead"><option value="24">24 h before</option><option value="6">6 h before</option><option value="2" selected>2 h before</option></select></label>
@@ -90,6 +91,27 @@ async function ask(key, box) {
   box.replaceChildren(...out);
 }
 
+async function pastDays(origin, box) {  // 0020: all departures that day, not this flight
+  box.replaceChildren(el("p", "Looking for similar past days...", "muted"));
+  let d;
+  try { d = await get("/api/pastdays?" + new URLSearchParams({ flight_id: current, lead_h: $("lead").value })); }
+  catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
+  const out = [], a = d.answer, u = d.uncertainty;
+  if (d.status === "no_weather") out.push(el("p", `No weather data for ${origin}. Similar past days cover the 30 busiest airports.`, "muted"));
+  else if (a) out.push(el("p", `On the ${a.days} past days at ${origin} whose forecast looked most like this one, on average ${pct(a.late_share)} of departures left 15+ minutes late or were cancelled (range ${pct(a.range[0])} to ${pct(a.range[1])}). This is every departure from ${origin} that day, not your flight.`));
+  else out.push(el("p", `${u.reason} Not enough evidence, so no percent is shown.`, "muted"));
+  if (d.query) {
+    const det = el("details"), ul = el("ul", null, "evidence");
+    det.append(el("summary", `See the days (${d.days.length})`));
+    det.append(el("p", `This day's forecast: ${d.query.text}`, "note"));
+    d.days.forEach(x => ul.append(el("li", `${x.date}: ${pct(x.late_share)} late or cancelled (${x.n_late} of ${x.n_dep}), similarity ${x.similarity.toFixed(3)}. ${x.text}`)));
+    det.append(ul);
+    det.append(el("p", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}. Mean similarity ${u.mean_similarity == null ? "none" : u.mean_similarity.toFixed(3)}; below ${u.thin_below} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`, "note"));
+    out.push(det);
+  }
+  box.replaceChildren(...out);
+}
+
 async function get(url) {
   const r = await fetch(url);
   const body = await r.json();
@@ -123,6 +145,10 @@ function render(d) {
   out.push(el("h2", "How forecasts like this have done"));
   out.push(el("p", `On 2025, ${t.forecasts.toLocaleString("en-US")} forecasts in this risk band predicted a ${pct(t.predicted_miss)} chance of missing on average. ${pct(t.true_miss)} really missed.`));
 
+  const past = el("div");
+  out.push(el("h2", `Similar past days at ${f.origin}`), past);
+  pastDays(f.origin, past);
+
   if (a.verdict !== "keep") {
     out.push(el("h2", `Alternatives (${d.alternatives.length})`));
     if (d.alternatives.length) {
@@ -137,7 +163,8 @@ function render(d) {
   }
 
   out.push(el("h2", "Ask about this flight"));
-  if ($("deadline").value !== "60") out.push(el("p", "Questions use a 60-minute deadline. Set the deadline to 60 to ask.", "muted"));
+  if (!d.askable) out.push(el("p", STATUS.not_in_graph, "muted"));
+  else if ($("deadline").value !== "60") out.push(el("p", "Questions use a 60-minute deadline. Set the deadline to 60 to ask.", "muted"));
   else {
     const qs = el("div", null, "questions"), answer = el("div");
     QUESTIONS.forEach(([key, text]) => { const b = el("button", text); b.type = "button"; b.onclick = () => ask(key, answer); qs.append(b); });

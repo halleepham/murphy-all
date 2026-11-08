@@ -147,8 +147,8 @@ Refit as `final_network`; Brier slightly better, net per 1,000 about the same, s
   shown. *Course asks for:* three question types (basic, multi-hop, analytics), a
   baseline comparison, and a stated limitation.
 - **Vector retrieval.** Policies and similar past flights as evidence; code computes
-  what happened to them. Test as a model input if time allows. *Course asks for:* a
-  comparison against a simpler method, such as BM25.
+  what happened to them. Test as a model input if time allows. Compared against simpler
+  methods, BM25 among them (`AGENTS.md`: one simpler baseline per stage; BM25 is our pick).
 - **Trust.** The three parts above.
 
 *Built (`0018`):* the graph, 6 node types and 9 relationship types over 4–12 Jan 2025, with
@@ -156,7 +156,9 @@ fixed queries.
 
 *Built (`0019`):* GraphRAG over suggested questions, compared with no communities, BM25 and
 no retrieval on 4 flights. In the app as four questions beside the trip (`0019` Decision 3).
-Vector retrieval and policies are next.
+*Built (`0020`):* similar past airport-days, embeddings vs BM25, plain numbers, month average and
+random days on 2025. Embeddings tie BM25 and plain numbers; all beat the averages. In the app as
+evidence beside the forecast. Policies are next.
 
 ### 6. GenAI.
 

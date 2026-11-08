@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 
 from murphy.cost import estimated_fare
 from murphy.graph import DEADLINE_MIN as GRAPH_DEADLINE_MIN  # the graph's chances use this deadline
+from murphy.graph import WINDOW as GRAPH_WINDOW  # the dates the questions cover
 from murphy.forecast.sample import ROOT
 from murphy.forecast.score import PCOLS
 from murphy.recommend import FIRM_FROM, MAX_EARLIER_H, UNSURE_FROM, p_make, verdict
@@ -63,6 +64,7 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
             "flight": {"flight": f"{t.carrier} {t.flight_number}", "flight_id": t.flight_id, "date": str(t.flight_date)[:10],
                        "origin": t.origin, "dest": t.dest, "departs_local": t.crs_dep_local, "arrives_local": t.crs_arr_local},
             "alternatives": alts,
+            "askable": GRAPH_WINDOW[0] <= str(t.flight_date)[:10] <= GRAPH_WINDOW[1],
             "provenance": {"model": MODEL, "forecast_as_of_utc": str(t.as_of_utc), "lead_h": int(t.lead_h),
                            "data": "BTS On-Time Performance 2025; IEM weather", "decisions": ["0014", "0015", "0016", "0017"]},
             "uncertainty": {"track_record": {"band": band, "forecasts": int(track.forecasts),
@@ -81,11 +83,27 @@ def neo4j_sessions():
     return session
 
 
-def create_app(db: Path = DB, graph_session=None) -> FastAPI:
-    """graph_session: a function returning a Neo4j session (a fake one in tests)."""
+def pastdays_index():
+    """Loads the similar-past-days index (0020) on first use; None if it is not built."""
+    state = {}
+    def index():
+        if "ix" not in state:
+            import pandas as pd
+            from murphy import pastdays as pdays
+            if not (pdays.OUT / "corpus.parquet").exists():
+                return None
+            state["ix"] = pdays.Index(pd.read_parquet(pdays.OUT / "corpus.parquet"), np.load(pdays.OUT / "embed.npy"))
+        return state["ix"]
+    return index
+
+
+def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=None) -> FastAPI:
+    """graph_session: a function returning a Neo4j session (a fake one in tests).
+    past_index, taf_as_of: the similar-past-days index and TAF lookup (fakes in tests)."""
     app = FastAPI(title="murphy")
     con = duckdb.connect(str(db), read_only=True)
     graph_session = graph_session or neo4j_sessions()
+    past_index = past_index or pastdays_index()
 
     @app.get("/")
     def page():
@@ -100,12 +118,15 @@ def create_app(db: Path = DB, graph_session=None) -> FastAPI:
 
     @app.get("/api/examples")
     def examples():
-        """Picked by forecast alone: flights with a high risk at 2 h and a 60-minute deadline."""
+        """Picked by forecast alone: flights with a high risk at 2 h and a 60-minute deadline.
+        Three from the dates the questions cover, three from the rest of 2025."""
         miss = " + ".join(f"coalesce({k}, 0)" for k in PCOLS[:5])
         rows = con.cursor().execute(
-            f"SELECT flight_id, carrier || ' ' || flight_number AS flight, origin, dest, flight_date::VARCHAR AS date FROM trips "
+            f"SELECT flight_id, carrier || ' ' || flight_number AS flight, origin, dest, flight_date::VARCHAR AS date, "
+            f"flight_date::DATE BETWEEN ?::DATE AND ?::DATE AS askable FROM trips "
             f"WHERE lead_h = 2 AND flight_id IN (SELECT DISTINCT flight_id FROM alts WHERE lead_h = 2) AND 1 - ({miss}) >= ? "
-            "ORDER BY md5(flight_id) LIMIT 6", [FIRM_FROM]).df()
+            "QUALIFY row_number() OVER (PARTITION BY askable ORDER BY md5(flight_id)) <= 3 ORDER BY NOT askable, md5(flight_id)",
+            [*GRAPH_WINDOW, FIRM_FROM]).df()
         return rows.to_dict("records")
 
     @app.get("/api/trip")
@@ -117,6 +138,26 @@ def create_app(db: Path = DB, graph_session=None) -> FastAPI:
         if got is None:
             raise HTTPException(404, "No forecast for this flight at this time. Forecasts cover sampled 2025 flights only.")
         return got
+
+    @app.get("/api/pastdays")
+    def pastdays(flight_id: str, lead_h: int = 2):
+        """Similar earlier days at the origin, with what happened on them (0020). Never the trip's own day."""
+        from datetime import datetime
+        import pandas as pd
+        from murphy import pastdays as pdays
+        if lead_h not in LEADS:
+            raise HTTPException(422, f"lead_h must be one of {sorted(LEADS)}")
+        t = con.cursor().execute("SELECT origin, flight_date, as_of_utc FROM trips WHERE flight_id = ? AND lead_h = ?",
+                                 [flight_id, lead_h]).df()
+        if t.empty:
+            raise HTTPException(404, "No forecast for this flight at this time.")
+        ix = past_index()
+        if ix is None:
+            raise HTTPException(503, "Similar past days are not built on this machine.")
+        t = t.iloc[0]
+        tz = pd.read_parquet(ROOT / "data" / "airports.parquet").set_index("airport").tz.get(t.origin)
+        return pdays.similar(ix, t.origin, pd.Timestamp(t.flight_date).date(), pd.Timestamp(t.as_of_utc).to_pydatetime(),
+                             tz, taf_as_of)
 
     @app.get("/api/ask")
     def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,

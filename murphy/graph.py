@@ -25,6 +25,7 @@ from murphy.forecast.score import PCOLS
 from murphy.recommend import p_make
 
 ROOT = Path(__file__).resolve().parent.parent
+WINDOW = ("2025-01-04", "2025-01-12")  # inclusive; two storms and calm days (0018 Decision 4)
 DEADLINE_MIN = 60  # the deadline the replay reports at (0016): 60 minutes after scheduled arrival
 LEADS = (24, 6, 2)
 BATCH = 5000

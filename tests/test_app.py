@@ -26,9 +26,11 @@ def alt(fid, aid, make, carrier, earlier_h=0.0):
 def client(tmp_path_factory):
     path = tmp_path_factory.mktemp("app") / "t.duckdb"
     con = duckdb.connect(str(path))
-    trips = pd.DataFrame([trip("low", .9), trip("mid", .5), trip("high", .2), trip("gone", .2, True), trip("alone", .2), trip("low2", .9)])
+    trips = pd.DataFrame([trip("low", .9), trip("mid", .5), trip("high", .2), trip("gone", .2, True), trip("alone", .2), trip("low2", .9),
+                          trip("jan", .2) | {"flight_date": "2025-01-05"}])
     alts = pd.DataFrame([alt("high", "a1", .9, "UA"), alt("high", "a2", .8, "DL"), alt("high", "a3", .7, "XX"),
-                         alt("high", "a4", .95, "UA", earlier_h=3), alt("mid", "a5", .9, "UA"), alt("low2", "a6", .5, "UA")])
+                         alt("high", "a4", .95, "UA", earlier_h=3), alt("mid", "a5", .9, "UA"), alt("low2", "a6", .5, "UA"),
+                         alt("jan", "a7", .9, "UA")])
     fares = pd.DataFrame({"origin": ["LGA", "LGA"], "dest": ["ORD", "ORD"], "carrier": ["UA", "DL"], "tickets": [100, 100], "fare": [300.0, 200.0]})
     track = pd.DataFrame([{"deadline_min": 60, "band": b, "forecasts": 10, "predicted_miss": .5, "true_miss": .6} for b in ("keep", "too_uncertain", "high")])
     for name in ("trips", "alts", "fares", "track"):
@@ -94,6 +96,13 @@ def test_unknown_flight_and_bad_settings_are_refused(client):
 def test_no_outcome_reaches_the_screen(client):
     text = get(client, "high").text
     assert "outcome" not in text and "arr_delay" not in text
+
+
+def test_examples_put_flights_the_questions_cover_first(client):
+    rows = client.get("/api/examples").json()
+    assert rows[0]["flight_id"] == "jan" and rows[0]["askable"] and not any(r["askable"] for r in rows[1:])
+    assert len(rows) <= 6
+    assert get(client, "jan").json()["askable"] and not get(client, "high").json()["askable"]
 
 
 def test_find_a_flight(client):
@@ -178,3 +187,27 @@ def test_graph_down_is_said_plainly(asker):
     graph["down"] = True
     r = ask(c)
     assert r.status_code == 503 and "not reachable" in r.json()["detail"]
+
+
+@pytest.fixture
+def past_client(client, tmp_path):
+    from tests.test_pastdays import fake_taf, trip_index
+    from datetime import date
+    path = tmp_path / "p.duckdb"
+    con = duckdb.connect(str(path))
+    trips = pd.DataFrame([trip("high", .2) | {"origin": "ORD"}, trip("far", .2) | {"origin": "ABQ"}])
+    con.execute("CREATE TABLE trips AS SELECT * FROM trips")
+    con.close()
+    return TestClient(create_app(path, past_index=lambda: trip_index(80, 0.99), taf_as_of=fake_taf(date(2025, 3, 1))))
+
+
+def test_similar_past_days_for_a_trip(past_client):
+    d = past_client.get("/api/pastdays", params={"flight_id": "high"}).json()
+    assert d["status"] == "ok" and d["answer"]["days"] == 10
+    assert all(x["date"] < "2025-03-01" for x in d["days"])      # the trip's own day never shows
+    assert d["provenance"]["decisions"] == ["0020"] and d["uncertainty"]["thin_below"] == 0.92
+
+
+def test_similar_past_days_refuses_unknown_and_says_no_weather(past_client):
+    assert past_client.get("/api/pastdays", params={"flight_id": "nope"}).status_code == 404
+    assert past_client.get("/api/pastdays", params={"flight_id": "far"}).json()["status"] == "no_weather"

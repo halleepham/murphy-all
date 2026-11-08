@@ -201,3 +201,16 @@ outside 4–12 Jan 2025 gets "Questions cover flights from 4 to 12 January 2025 
 named AA1276 (22%) and DL921 (26%) against 42%; the app's table for the same settings lists the
 same two flights at 21.9% and 25.8% chance of missing. No number outside the evidence. Answers to
 the changed `better` question were not rerun on the other cases.
+
+## Decision 4 — Examples reach the questions' dates; buttons hide outside them
+
+**AI recommended, owner accepted (option A, 7 Nov 2026).** The owner tried every example, and
+each said "Questions cover flights from 4 to 12 January 2025 only." Only 370 of 6,920 high-risk
+example candidates (5%) fall in those dates, and none of the 6 picked did. Now 3 examples come from
+4-12 Jan and 3 from the rest of 2025. Outside the dates, the section says so with no buttons
+(`askable` in `/api/trip`). The dates live in `murphy.graph.WINDOW`, read by the build and the app.
+Checked live: F9 4195 LGA-MIA, 9 Jan, "How likely..." answered with 1 evidence row.
+
+**Alternatives:** B, fix the examples only. C, load more dates into the graph: a rebuild,
+limited by the free Neo4j tier. The owner will revisit this when finishing the app (PLAN 7).
+
