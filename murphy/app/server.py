@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from murphy.cost import estimated_fare
+from murphy.graph import DEADLINE_MIN as GRAPH_DEADLINE_MIN  # the graph's chances use this deadline
 from murphy.forecast.sample import ROOT
 from murphy.forecast.score import PCOLS
 from murphy.recommend import FIRM_FROM, MAX_EARLIER_H, UNSURE_FROM, p_make, verdict
@@ -69,9 +70,22 @@ def advice(con, flight_id: str, lead_h: int, deadline_min: int, max_earlier_h: f
                             "limits": LIMITS}}
 
 
-def create_app(db: Path = DB) -> FastAPI:
+def neo4j_sessions():
+    """Opens the Neo4j driver on first use, so the rest of the app runs without it."""
+    state = {}
+    def session():
+        if "driver" not in state:
+            from murphy import graph as kg
+            state["driver"], state["db"] = kg.connect()
+        return state["driver"].session(database=state["db"])
+    return session
+
+
+def create_app(db: Path = DB, graph_session=None) -> FastAPI:
+    """graph_session: a function returning a Neo4j session (a fake one in tests)."""
     app = FastAPI(title="murphy")
     con = duckdb.connect(str(db), read_only=True)
+    graph_session = graph_session or neo4j_sessions()
 
     @app.get("/")
     def page():
@@ -103,5 +117,25 @@ def create_app(db: Path = DB) -> FastAPI:
         if got is None:
             raise HTTPException(404, "No forecast for this flight at this time. Forecasts cover sampled 2025 flights only.")
         return got
+
+    @app.get("/api/ask")
+    def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,
+            max_earlier_h: float = Query(MAX_EARLIER_H, ge=0, le=24)):
+        """A suggested question about the trip (0019). The graph's chances use a 60-minute deadline,
+        so other deadlines are refused rather than shown next to a different number."""
+        from murphy import graphrag as gr
+        if question not in gr.QUESTIONS:
+            raise HTTPException(422, f"question must be one of {sorted(gr.QUESTIONS)}")
+        if lead_h not in LEADS:
+            raise HTTPException(422, f"lead_h must be one of {sorted(LEADS)}")
+        if deadline_min != GRAPH_DEADLINE_MIN:
+            raise HTTPException(422, f"Questions use a {GRAPH_DEADLINE_MIN}-minute deadline. Set the deadline to {GRAPH_DEADLINE_MIN} to ask.")
+        try:
+            with graph_session() as s:
+                return gr.answer(s, question, flight_id, lead_h, max_earlier_h)
+        except Exception as e:  # Neo4j unreachable (e.g. Aura paused): say so, do not guess
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(503, "The knowledge graph is not reachable right now.")
 
     return app

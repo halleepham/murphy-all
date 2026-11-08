@@ -100,3 +100,81 @@ def test_find_a_flight(client):
     rows = client.get("/api/flights", params={"date": "2025-03-01", "carrier": "dl", "number": 1}).json()
     assert len(rows) == 6
     assert client.get("/api/flights", params={"date": "not-a-date", "carrier": "DL", "number": 1}).json() == []
+
+
+# --- Suggested questions (0019): a fake graph, no Groq call -------------------------------------
+
+from contextlib import contextmanager
+from murphy import graphrag as gr
+from tests.test_graphrag import FakeSession
+
+FLIGHT = [{"flight": "F", "forecasts": [{"lead_h": 2, "as_of": None, "p_miss": 0.42}]}]
+
+
+@pytest.fixture
+def asker(tmp_path, monkeypatch):
+    seen = {}
+    class Recording(FakeSession):
+        def run(self, cypher, **params):
+            seen.update(params)
+            return super().run(cypher, **params)
+    rows = {"flight": FLIGHT, "alternatives": [{"alternative": "A", "alt_p_miss": 0.16, "trip_p_miss": 0.42}]}
+    graph = {"rows": rows}
+
+    @contextmanager
+    def session():
+        if graph.get("down"):
+            raise OSError("unreachable")
+        yield Recording(graph["rows"])
+    duckdb.connect(str(tmp_path / "e.duckdb")).close()
+    c = TestClient(create_app(tmp_path / "e.duckdb", graph_session=session))
+    return c, graph, seen
+
+
+def ask(c, question="chance", **kw):
+    return c.get("/api/ask", params={"flight_id": "F", "question": question, "lead_h": 2, **kw})
+
+
+def test_a_question_returns_the_explanation_its_evidence_and_checks(asker, monkeypatch):
+    c, _, _ = asker
+    monkeypatch.setattr(gr, "llm", lambda msgs, wait=True: "A 42% chance of being late [E1].")
+    d = ask(c).json()
+    assert d["status"] == "answered" and d["evidence"][0]["tag"] == "E1"
+    assert d["checks"] == {"invented": [], "bad_tags": [], "cited": 1}
+    assert d["provenance"]["queries"] == ["flight"]
+
+
+def test_other_deadlines_are_refused_not_shown_beside_a_different_number(asker):
+    c, _, _ = asker
+    r = ask(c, deadline_min=30)
+    assert r.status_code == 422 and "60-minute" in r.json()["detail"]
+
+
+def test_at_the_daily_limit_the_evidence_still_shows(asker, monkeypatch):
+    c, _, _ = asker
+    def limited(msgs, wait=True):
+        raise gr.Paused("400")
+    monkeypatch.setattr(gr, "llm", limited)
+    d = ask(c, question="better").json()
+    assert d["status"] == "paused" and d["explanation"] is None and len(d["evidence"]) == 1
+
+
+def test_the_travelers_earlier_limit_reaches_the_query(asker, monkeypatch):
+    c, _, seen = asker
+    monkeypatch.setattr(gr, "llm", lambda msgs, wait=True: "ok")
+    ask(c, question="better", max_earlier_h=3)
+    assert seen["max_earlier_h"] == 3.0
+
+
+def test_a_flight_outside_the_graph_calls_no_llm(asker, monkeypatch):
+    c, graph, _ = asker
+    graph["rows"] = {}
+    monkeypatch.setattr(gr, "llm", lambda msgs, wait=True: pytest.fail("LLM called"))
+    assert ask(c).json()["status"] == "not_in_graph"
+
+
+def test_graph_down_is_said_plainly(asker):
+    c, graph, _ = asker
+    graph["down"] = True
+    r = ask(c)
+    assert r.status_code == 503 and "not reachable" in r.json()["detail"]

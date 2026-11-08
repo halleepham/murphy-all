@@ -178,3 +178,26 @@ stopped by owner's choice when the daily limit slowed calls: 39 of 56 answers; W
   was cancelled [E9]", outcomes learned after the forecast. The prompt says not to use facts known
   after `as_of`; with no time filter in retrieval, the rule alone did not hold. The graph's queries
   never return them.
+
+## Decision 3 — The questions in the app
+
+**Owner decided, 7 Nov 2026, on AI's options.**
+
+- **Only at a 60-minute deadline (chosen; recommended).** The graph's chances use 60 minutes. At 30
+  or 120 the screen says "set the deadline to 60 to ask", so it never shows two chances for one
+  flight. Rejected: always, with a label (two numbers on screen); every deadline (a graph rebuild:
+  each alternative's link holds only the 60-minute chance).
+- **"Is there a better flight?" uses the traveler's "leave up to X h earlier" (chosen;
+  recommended).** Before, the query took any flight leaving from 1 h after the forecast, up to 23 h
+  before the trip, so it named DL414 for AA3104 at 24 h (2 h 46 min earlier), which the app's table
+  does not list at its default of 2 h. Rejected: keep it with a label; drop the question.
+
+Built: `GET /api/ask` in `murphy/app/server.py`, `murphy.graphrag.answer`, the "Ask about this
+flight" section of the page. The evidence rows always show, under "See the evidence". If Groq's
+daily limit is reached, the page says the explanation is paused and still shows them. A flight
+outside 4–12 Jan 2025 gets "Questions cover flights from 4 to 12 January 2025 only."
+
+**Checked live, 7 Nov 2026:** AA3104 at 24 h, 60 min, 2 h earlier. "Is there a better flight?"
+named AA1276 (22%) and DL921 (26%) against 42%; the app's table for the same settings lists the
+same two flights at 21.9% and 25.8% chance of missing. No number outside the evidence. Answers to
+the changed `better` question were not rerun on the other cases.

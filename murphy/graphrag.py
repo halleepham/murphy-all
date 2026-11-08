@@ -78,14 +78,14 @@ def fmt(v, key=""):
     return v
 
 
-def evidence(session, key: str, flight_id: str, lead_h: int, communities=True) -> list[dict]:
+def evidence(session, key: str, flight_id: str, lead_h: int, communities=True, max_earlier_h: float = 24) -> list[dict]:
     """Rows from the question's fixed queries, each tagged. Without communities, the `why` query
     keeps only the origin's own weather row and drops the community fields."""
     out = []
     for q in QUESTIONS[key][1]:
         if q == "community_day" and not communities:
             continue
-        for row in kg.ask(session, q, flight_id, lead_h):
+        for row in kg.ask(session, q, flight_id, lead_h, max_earlier_h):
             if q == "why" and row.get("co_disruption_weight") is not None and row.get("metar_id") is None:
                 continue
             if not communities:
@@ -112,8 +112,13 @@ def messages(question: str, flight_id: str, lead_h: int, ev: list[dict] | None) 
             {"role": "user", "content": f"{head}\n\nWhat the fields mean:\n{terms}\n\nEvidence:\n{body}"}]
 
 
-def llm(msgs: list[dict]) -> str:
-    """One Groq call, temperature 0, cached on disk by the exact request."""
+class Paused(Exception):
+    """Groq's free daily limit is reached; the app shows the evidence without an explanation."""
+
+
+def llm(msgs: list[dict], wait=True) -> str:
+    """One Groq call, temperature 0, cached on disk by the exact request. With wait=False (the app),
+    a rate limit raises Paused at once instead of sleeping."""
     req = {"model": MODEL, "messages": msgs, "temperature": 0}
     h = hashlib.sha256(json.dumps(req, sort_keys=True).encode()).hexdigest()
     if CACHE.exists():
@@ -128,10 +133,12 @@ def llm(msgs: list[dict]) -> str:
                        headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"})
         if r.status_code != 429:
             break
-        wait = float(r.headers.get("retry-after", 20))
-        if wait > 3600:  # stop; the cache keeps what was done, so a rerun resumes
-            raise SystemExit(f"Groq rate limit: retry after {wait:.0f} s. {r.text[:200]}")
-        time.sleep(wait + 1)
+        if not wait:
+            raise Paused(r.headers.get("retry-after", ""))
+        pause = float(r.headers.get("retry-after", 20))
+        if pause > 3600:  # stop; the cache keeps what was done, so a rerun resumes
+            raise SystemExit(f"Groq rate limit: retry after {pause:.0f} s. {r.text[:200]}")
+        time.sleep(pause + 1)
     r.raise_for_status()
     answer = r.json()["choices"][0]["message"]["content"].strip()
     CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +146,32 @@ def llm(msgs: list[dict]) -> str:
         f.write(json.dumps({"hash": h, "model": MODEL, "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                             "answer": answer}) + "\n")
     return answer
+
+
+def answer(session, key: str, flight_id: str, lead_h: int, max_earlier_h: float) -> dict:
+    """What the app shows for one suggested question: the evidence always; the explanation and its
+    checks when Groq answers. Answer + Evidence + Provenance + Uncertainty."""
+    question = QUESTIONS[key][0]
+    out = {"question": question, "evidence": [], "explanation": None, "checks": None,
+           "provenance": {"queries": QUESTIONS[key][1], "llm": MODEL, "graph": "Neo4j, flights 4-12 Jan 2025 (0018)",
+                          "decisions": ["0018", "0019"]}}
+    if not kg.ask(session, "flight", flight_id, lead_h):
+        out["status"] = "not_in_graph"
+        return out
+    ev = evidence(session, key, flight_id, lead_h, max_earlier_h=max_earlier_h)
+    out["evidence"] = ev
+    if not ev:  # nothing to explain: code says so, no LLM call
+        out["status"] = "no_evidence"
+        return out
+    msgs = messages(question, flight_id, lead_h, ev)
+    try:
+        out["explanation"] = llm(msgs, wait=False)
+    except (Paused, httpx.HTTPError):
+        out["status"] = "paused"
+        return out
+    out["checks"] = check(out["explanation"], msgs[-1]["content"], ev)
+    out["status"] = "answered"
+    return out
 
 
 NUM = re.compile(r"\d+(?:\.\d+)?")

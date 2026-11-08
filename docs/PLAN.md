@@ -155,7 +155,8 @@ Refit as `final_network`; Brier slightly better, net per 1,000 about the same, s
 fixed queries.
 
 *Built (`0019`):* GraphRAG over suggested questions, compared with no communities, BM25 and
-no retrieval on 4 flights. Not yet in the app. Vector retrieval and policies are next.
+no retrieval on 4 flights. In the app as four questions beside the trip (`0019` Decision 3).
+Vector retrieval and policies are next.
 
 ### 6. GenAI.
 

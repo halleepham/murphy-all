@@ -147,6 +147,7 @@ QUERIES = {
                                       p_miss: f['p_miss_' + toString(l) + 'h']}] AS forecasts"""),
     "alternatives": ("Traversal: alternatives offered at a lead, least likely to miss first",
         """MATCH (a:Flight)-[r:ALTERNATIVE_FOR {lead_h: $lead_h}]->(f:Flight {id: $flight_id}), (a)-[:MARKETED_BY]->(c:Carrier)
+           WHERE r.alt_lead_h - $lead_h >= -$max_earlier_h
            RETURN a.id AS alternative, c.code AS carrier, a.crs_dep_local AS dep_local, r.arr_ahead_min AS arr_ahead_min,
                   r.p_miss AS alt_p_miss, f['p_miss_' + toString($lead_h) + 'h'] AS trip_p_miss
            ORDER BY r.p_miss LIMIT 5"""),
@@ -190,9 +191,13 @@ QUERIES = {
 }
 
 
-def ask(session, name: str, flight_id: str, lead_h: int) -> list[dict]:
+def ask(session, name: str, flight_id: str, lead_h: int, max_earlier_h: float = 24) -> list[dict]:
+    """max_earlier_h: how much earlier than the trip an alternative may leave, the app's setting.
+    24 means no limit: an alternative leaves at least 1 h after the forecast (0011)."""
     if name not in QUERIES:
         raise ValueError(f"unknown query {name!r}")
     if lead_h not in LEADS:
         raise ValueError(f"lead_h must be one of {LEADS}")
-    return session.run(QUERIES[name][1], flight_id=flight_id, lead_h=lead_h).data()
+    if not 0 <= max_earlier_h <= 24:
+        raise ValueError("max_earlier_h must be between 0 and 24")
+    return session.run(QUERIES[name][1], flight_id=flight_id, lead_h=lead_h, max_earlier_h=float(max_earlier_h)).data()

@@ -18,6 +18,8 @@
   .error { color: #a00; }
   ul { padding-left: 20px; }
   button.link { background: none; border: 0; padding: 0; color: #0645ad; text-decoration: underline; cursor: pointer; }
+  .questions button { margin: 0 8px 8px 0; }
+  .evidence li { font-size: .85rem; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -54,6 +56,39 @@ const WORDS = {
   cancelled: "This flight is already known to be cancelled",
 };
 let current = null;
+const QUESTIONS = [  // murphy.graphrag.QUESTIONS (0019)
+  ["chance", "How likely is this flight to make me late?"],
+  ["better", "Is there a better flight?"],
+  ["why", "Why is this flight at risk?"],
+  ["region", "How are the regions doing today?"],
+];
+const STATUS = {
+  not_in_graph: "Questions cover flights from 4 to 12 January 2025 only.",
+  no_evidence: "The knowledge graph holds nothing for this question, so there is nothing to explain.",
+  paused: "Explanations are paused: the language model's free daily limit is reached. The evidence below comes straight from the knowledge graph.",
+};
+
+function show(v) { return Array.isArray(v) ? v.map(x => typeof x === "object" ? JSON.stringify(x) : x).join(", ") : v; }
+
+async function ask(key, box) {
+  box.replaceChildren(el("p", "Looking in the knowledge graph...", "muted"));
+  const q = new URLSearchParams({ flight_id: current, question: key, lead_h: $("lead").value, deadline_min: $("deadline").value, max_earlier_h: $("earlier").value });
+  let d;
+  try { d = await get("/api/ask?" + q); } catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
+  const out = [el("p", d.question, "muted")];
+  out.push(el("p", d.explanation || STATUS[d.status]));
+  if (d.checks && d.checks.invented.length) out.push(el("p", "Check: these numbers are not in the evidence: " + d.checks.invented.join(", "), "error"));
+  if (d.checks && d.checks.bad_tags.length) out.push(el("p", "Check: it cites evidence that does not exist: " + d.checks.bad_tags.join(", "), "error"));
+  if (d.evidence.length) {
+    const det = el("details"), ul = el("ul", null, "evidence");
+    det.append(el("summary", `See the evidence (${d.evidence.length} rows)`));
+    d.evidence.forEach(r => ul.append(el("li", `[${r.tag}] ${r.query}: ` + Object.entries(r).filter(([k]) => k !== "tag" && k !== "query").map(([k, v]) => `${k} ${show(v)}`).join("; "))));
+    det.append(ul);
+    det.append(el("p", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number. Decision records: ${d.provenance.decisions.join(", ")}.`, "note"));
+    out.push(det);
+  }
+  box.replaceChildren(...out);
+}
 
 async function get(url) {
   const r = await fetch(url);
@@ -99,6 +134,14 @@ function render(d) {
       out.push(el("p", "Estimated new ticket: the median fare people paid on this route and airline (or route, if the airline has too little data), from " + d.alternatives[0].cost.source + ". Flights on one airline show the same figure, so sorting by price compares airlines, not departure times.", "note"));
       if (d.alternatives.some(x => x.same_airline)) out.push(el("p", "* Same airline: this may cost only a fare difference, which the data does not show.", "note"));
     } else out.push(el("p", "No flight leaves within your limits and arrives by the deadline.", "muted"));
+  }
+
+  out.push(el("h2", "Ask about this flight"));
+  if ($("deadline").value !== "60") out.push(el("p", "Questions use a 60-minute deadline. Set the deadline to 60 to ask.", "muted"));
+  else {
+    const qs = el("div", null, "questions"), answer = el("div");
+    QUESTIONS.forEach(([key, text]) => { const b = el("button", text); b.type = "button"; b.onclick = () => ask(key, answer); qs.append(b); });
+    out.push(qs, answer);
   }
 
   out.push(el("h2", "Where this came from"));
