@@ -68,18 +68,18 @@
   <div class="about-grid two">
     <section class="card">
       <h2>Data</h2>
-      <!-- Counts: docs/decisions/0006 (flight legs), 0007 (1,123,438 ASOS + 374,113 TAF), 0010 (2025 forecasts). -->
+      <!-- Counts: docs/decisions/0006 (flight legs), 0007 (1,123,438 ASOS + 374,113 TAF), 0027 (2026 forecasts, scored once). -->
       <div class="stats">
         <div><b>26.3M</b><span>US flight legs, Jan 2023 – Aug 2026</span></div>
         <div><b>1.5M</b><span>weather reports and forecasts</span></div>
-        <div><b>2.07M</b><span>forecasts scored on 2025</span></div>
+        <div><b>1.44M</b><span>forecasts scored on 2026</span></div>
       </div>
       <ul>
         <li><strong>Flights:</strong> <a href="https://www.transtats.bts.gov/DatabaseInfo.asp?QO_VQ=EFD">BTS On-Time Performance</a>, marketing carrier table. American, Delta, United, Southwest, Alaska, JetBlue, Frontier and their regional partners.</li>
         <li><strong>Weather:</strong> <a href="https://mesonet.agron.iastate.edu/request/download.phtml">Iowa Environmental Mesonet</a> ASOS observations and TAF forecasts as issued, at the 30 busiest airports.</li>
         <li><strong>Fares:</strong> <a href="https://www.transtats.bts.gov/DatabaseInfo.asp?QO_VQ=EFI">BTS DB1B Market</a>, 2025 Q2: what people paid.</li>
         <li><strong>Rules:</strong> 14 CFR parts <a href="https://www.ecfr.gov/current/title-14/part-250">250</a>, <a href="https://www.ecfr.gov/current/title-14/part-259">259</a> and <a href="https://www.ecfr.gov/current/title-14/part-260">260</a>, and the <a href="https://www.delta.com/us/en/legal/contract-of-carriage-dgr">Delta</a> and <a href="https://www.southwest.com/swa-resources/pdfs/corporate-commitments/contract-of-carriage.pdf">Southwest</a> contracts of carriage.</li>
-        <li><strong>Split:</strong> train on 2023–24, test on 2025. 2026 stays sealed until the end.</li>
+        <li><strong>Split:</strong> train on 2023–24, tune on 2025, test on Jan–Aug 2026, sealed until the end and scored once.</li>
       </ul>
     </section>
     <section class="card">
@@ -96,19 +96,19 @@
 
   <section class="card about-wide" style="margin-top:24px">
     <h2>What we found</h2>
-    <!-- Sources: 0017 Finding 4 and data/forecast/network/final_compare.csv (forecast); data/forecast/app/replay.duckdb, table track (track record);
-         0014 Finding 4 (advice, 60-minute deadline); 0020 (similar days); 0021 (rules); 0019 Finding 2 (answers); 0022 Finding 1 (GCN). -->
+    <!-- Sources: 0027 Finding 1 and data/forecast/eval_2026/test/scores.csv, bands.csv (forecast, track record, 2026);
+         0027 Finding 2 (advice, 60-minute deadline, 2026); 0020 (similar days); 0021 (rules); 0019 Finding 2 (answers); 0022 Finding 1 (GCN). -->
     <ul>
-      <li><strong>Better than the usual guess.</strong> The forecast beats the usual-for-the-airport rate at every lead time (Brier score 0.537 vs. 0.603 two hours out, 2,070,453 forecasts).</li>
-      <li><strong>Honest about itself.</strong> Close when it says keep (7.8% predicted to miss, 8.5% did); low on risky flights (74.5% vs. 82.0%), and the app says so. From 40% to 60% risk it says too uncertain instead of guessing.</li>
-      <li><strong>Advice is rare and earned.</strong> It keeps 97% of trips. At 60% risk and up, a change rescued 2,503 trips against 660 needless ones.</li>
+      <li><strong>Better than the usual guess.</strong> On 2026, a year it never saw, the forecast beats the usual-for-the-airport rate at every lead time (Brier score 0.541 vs. 0.614 two hours out, 1,439,445 forecasts).</li>
+      <li><strong>Honest about itself.</strong> Close when it says keep (8.7% predicted to miss, 8.9% did); low on risky flights (74.8% vs. 81.8%), and the app says so. From 40% to 60% risk it says too uncertain instead of guessing.</li>
+      <li><strong>Advice is rare and earned.</strong> It keeps 96% of trips. At 60% risk and up, a change rescued 2,235 trips against 712 needless ones.</li>
       <li><strong>Hindsight kept out.</strong> Graph evidence is filtered by time; plain keyword search (BM25) pulled in later outcomes in 12 of 16 evidence sets.</li>
       <li><strong>Network:</strong> the GCN finds the airports that go bad next, but from each airport's own state, not its links.</li>
     </ul>
     <table class="about-table">
       <thead><tr><th>Compared with something simpler</th><th>Murphy</th><th>Simpler</th></tr></thead>
       <tbody>
-        <tr><td>Change advice: net trips saved per 1,000 (60-minute deadline)</td><td>1.15</td><td>0.19, traveler's rule of thumb</td></tr>
+        <tr><td>Change advice: net trips saved per 1,000 (60-minute deadline, 2026)</td><td>1.44</td><td>0.19, traveler's rule of thumb</td></tr>
         <tr><td>Similar past days: error in share of late flights</td><td>8.2 points</td><td>9.1, month average</td></tr>
         <tr><td>Rules: right passage in the top 3 (16 questions)</td><td>14</td><td>8, BM25</td></tr>
         <tr><td>Ask answers with the key fact (7 checked)</td><td>6</td><td>5 BM25, 0 with no retrieval</td></tr>
@@ -133,12 +133,13 @@
     <li>Weather covers the 30 busiest airports only.</li>
     <li>Ask answers were scored on 4 flights; Groq's free daily limit stopped a larger test.</li>
     <li>No real users yet, so whether the evidence changes decisions is untested.</li>
+    <li>The 2026 test covers January to August: no fall or holiday travel.</li>
   </ul>
     </section>
     <section class="card">
       <h2>Next steps</h2>
       <ul>
-        <li>Open the sealed 2026 data once and score everything on it.</li>
+        <li>Fall and holiday travel, which the 2026 test did not cover.</li>
         <li>Connecting flights, where two legs can share one storm.</li>
         <li>A study with real travelers.</li>
       </ul>
