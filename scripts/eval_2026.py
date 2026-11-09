@@ -34,7 +34,7 @@ PAIRS = [("final_network", "clim_origin"), ("final_network", "schedule"), ("fina
 PUBLISHED_2025 = {"final_network": 0.5602, "final_clean": 0.5612, "clim_origin": 0.6026,
                   ("high", 60): 0.820, ("too_uncertain", 60): 0.533, ("keep", 60): 0.085}
 MAX_BLANK_GAP = 0.05                # network inputs may be blank this much more often than in 2025, no more
-log = lambda *a: print(*a, flush=True)
+log = lambda *a, **k: print(*a, flush=True, **k)
 
 
 # ---- small pieces, tested in tests/test_eval_2026.py ----

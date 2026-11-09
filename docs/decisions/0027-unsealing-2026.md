@@ -121,3 +121,95 @@ Its criteria will be written here before it runs.
 | Build 2026 network inputs before scoring, with a reproduction check | accepted | Blank inputs would test a broken pipeline |
 | Pass/fail tests G1–G7, relative to climatology | accepted | 2026 is harder for everyone; absolute scores would mislead |
 | Also report 2025 Jan–Aug | accepted | 2026 has no fall or holidays |
+
+## Finding 1 — The 2026 forecast test, 9 Nov 2026
+
+**Run once.** Commands, all `PYTHONPATH=. python scripts/eval_2026.py`, logs in `data/forecast/logs/eval_2026_*.log`:
+
+1. `inputs`: three GCNs refit (175, 157, 156 s). They reproduce the saved 2025 average exactly (largest difference
+   0.0), except the last 2 hours of 31 Dec 2025, which now see the 1 Jan schedule; saved 2025 inputs are kept, so
+   nothing changes there. 2026 rows with a blank GCN input: 9.8%, against 9.3% in 2025.
+2. `score tune`: reproduced 0.5602, 0.5612, 0.6026 and the 60-minute bands 82.0%, 53.3%, 8.5%.
+3. `score test`: 1,439,445 forecasts.
+4. `compare`. Its first run stopped at a printing bug (`log` took no `sep`), after the scores were written; fixed
+   and rerun. The fix changes no computed value.
+
+**All seven tests pass.**
+
+| # | Test | 2026 | 2025 | Result |
+|---|---|---|---|---|
+| G1 | `final_network` minus by-origin climatology | −0.0486 (−0.0531 to −0.0446) | −0.0424 (−0.0446 to −0.0402) | pass |
+| G2 | The same at 2, 6, 24 h | −0.0729, −0.0415, −0.0314, all below 0 | −0.0658, −0.0355, −0.0258 | pass |
+| G3 | At least half of 2025's gap (−0.0212) | −0.0486 | | pass |
+| G4 | Minus schedule-only | −0.0366 (−0.0416 to −0.0326) | −0.0331 | pass |
+| G5 | Late calibration gap, against climatology | 0.0053 against 0.0126 | 0.0112 against 0.0157 | pass |
+| G6 | "60% and up" true miss, 60 min | 80.7% (predicted 74.8%) | 82.0% | pass |
+| G7 | "40 to 60%" true miss, 60 min | 52.7% (predicted 48.4%) | 53.3% | pass |
+
+**Multiclass Brier, all forecasts.** Lower is better.
+
+| Model | 2026 | 2025 | 2025 Jan–Aug |
+|---|---|---|---|
+| uniform | 0.9375 | 0.9375 | 0.9375 |
+| climatology, global | 0.6172 | 0.6043 | 0.6140 |
+| climatology, by origin | 0.6145 | 0.6026 | 0.6120 |
+| schedule only (`l2abl_a`) | 0.6024 | 0.5933 | 0.6005 |
+| schedule + history (`l2abl_ab`) | 0.5982 | 0.5900 | 0.5970 |
+| `final_clean` | 0.5666 | 0.5612 | 0.5682 |
+| **`final_network`** | **0.5659** | **0.5602** | **0.5676** |
+
+**Late and cancelled Brier.**
+
+| Model | Late 2026 | Late 2025 | Late 2025 Jan–Aug | Cancelled 2026 | Cancelled 2025 | Cancelled 2025 Jan–Aug |
+|---|---|---|---|---|---|---|
+| climatology, by origin | 0.1870 | 0.1793 | 0.1837 | 0.0219 | 0.0153 | 0.0165 |
+| schedule only | 0.1791 | 0.1733 | 0.1752 | 0.0219 | 0.0153 | 0.0165 |
+| `final_clean` | 0.1525 | 0.1485 | 0.1504 | 0.0173 | 0.0134 | 0.0142 |
+| `final_network` | 0.1522 | 0.1479 | 0.1500 | 0.0171 | 0.0133 | 0.0142 |
+
+**Differences, multiclass Brier, 95% interval by day.**
+
+| Comparison | 2026 | 2025 | 2025 Jan–Aug |
+|---|---|---|---|
+| `final_network` − climatology | −0.0486 (−0.0531 to −0.0446) | −0.0424 (−0.0446 to −0.0402) | −0.0444 (−0.0471 to −0.0416) |
+| `final_network` − schedule only | −0.0366 (−0.0416 to −0.0326) | −0.0331 (−0.0352 to −0.0310) | −0.0329 (−0.0350 to −0.0309) |
+| `final_network` − schedule + history | −0.0323 (−0.0369 to −0.0284) | −0.0297 (−0.0317 to −0.0278) | −0.0294 (−0.0314 to −0.0275) |
+| `final_network` − `final_clean` (network inputs) | −0.00072 (−0.00101 to −0.00050) | −0.00093 (−0.00111 to −0.00077) | −0.00061 (−0.00074 to −0.00046) |
+| schedule only − climatology | −0.0121 (−0.0136 to −0.0104) | −0.0093 (−0.0108 to −0.0076) | −0.0115 (−0.0135 to −0.0095) |
+
+**Calibration, event "late", weighted mean gap:** `final_network` 0.0053 (2026), 0.0112 (2025), 0.0060 (2025 Jan–Aug);
+climatology 0.0126, 0.0157, 0.0258. In 2026 it still runs low above 20%, by 0.005 to 0.031 a bin; predicted late
+share 24.7% against 25.1% true.
+
+**The app's bands, `final_network`, true miss (predicted).**
+
+| Deadline | Band | 2026 | 2025 | 2025 Jan–Aug |
+|---|---|---|---|---|
+| 30 min | keep | 13.6% (13.4%) | 13.0% (12.3%) | 13.3% (13.2%) |
+| 30 min | too uncertain | 49.7% (48.2%) | 51.6% (48.2%) | 50.4% (48.1%) |
+| 30 min | 60% and up | 80.6% (76.1%) | 81.4% (75.7%) | 80.4% (75.4%) |
+| 60 min | keep | 8.9% (8.7%) | 8.5% (7.8%) | 8.8% (8.6%) |
+| 60 min | too uncertain | 52.7% (48.4%) | 53.3% (48.0%) | 51.7% (47.9%) |
+| 60 min | 60% and up | 80.7% (74.8%) | 82.0% (74.5%) | 80.9% (74.3%) |
+| 120 min | keep | 5.1% (4.8%) | 4.6% (4.2%) | 4.9% (4.7%) |
+| 120 min | too uncertain | 55.9% (48.6%) | 54.1% (48.2%) | 52.5% (48.2%) |
+| 120 min | 60% and up | 81.3% (73.4%) | 79.8% (72.4%) | 78.7% (72.5%) |
+
+2026 forecasts at 60 min: 1,383,828 keep, 33,432 too uncertain, 22,185 at 60% and up.
+
+**By aircraft inputs as recorded, under 24 h, multiclass Brier** (`final_network` / climatology): normal 0.5423 /
+0.5935 (922,058); overlap 1.0813 / 1.1777 (22,416); delay blank 0.6551 / 0.9717 (11,604); no tail 0.7989 / 1.3375
+(3,552). As on 2025, hidden flights score far worse than normal ones.
+
+**Read:**
+- The forecast holds up on a year it never saw. Its lead over climatology is about the same as on 2025, and a
+  little larger (−0.0486 against −0.0424, or −0.0444 for the same months of 2025). The intervals overlap.
+- 2026 is harder for every model. All absolute scores are worse than 2025's, close to 2025 Jan–Aug, so most of
+  the gap is season, not drift. Cancellations are higher in 2026 (Brier 0.0219 against 0.0165 for climatology).
+- Network inputs still help a little: −0.0007, interval below 0, about the size seen on 2025.
+- The bands mean what the app says they mean. "60% and up" misses about 81% of the time in every column.
+  The forecast still runs low on risky flights, as on 2025.
+- Not tested here: the advice replay (net per 1,000 against the rule of thumb). Fall and holiday travel.
+
+**Limits:** one year of eight months, the same 9.4% sample rule. The GCN for 2026 is the same refit, checked against
+2025; a model on both years, not a cross-fit. Climatology's 2026 score was already known (above).
