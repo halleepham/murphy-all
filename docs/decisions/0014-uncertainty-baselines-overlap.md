@@ -541,3 +541,20 @@ resampling whole days. "No overlap" removes overlapping trips and alternatives.
 | delay blank, under 24 h | -0.0006 (-0.0033 to 0.0016) | -0.2603 (-0.2891 to -0.2327) |
 
 **I. `final_clean`: Brier by round, 2025 grid at trained leads.** 25: 0.56844, 50: 0.56285, 75: 0.56069, 100: 0.55968, 125: 0.55911, 150: 0.55875, 175: 0.55852, 200: 0.55830, 225: 0.55819, 250: 0.55821, 275: 0.55819, 300: 0.55822.
+
+## Finding 4 — The baseline under the app's rule, 8 Nov 2026
+
+**Owner asked** for the rule-of-thumb comparison under the app's rule (firm from 60%, Decision 4) with the
+app's model, `final_network`, for the poster. `MURPHY_MODEL=final_network PYTHONPATH=. python
+scripts/replay_firm60.py` (20 s) → `replay_final_network/baselines_firm60.csv`. Only Murphy's cutoff changes;
+the app and `baselines.csv` are untouched.
+
+| Deadline | Murphy changes | Rescued / needless | Net per 1,000 | Thumb net | Murphy minus thumb |
+|---|---|---|---|---|---|
+| 30 min | 11,832 | 6,319 / 1,940 | 2.91 (2.67 to 3.10) | 0.45 | 2.45 (2.23 to 2.63) |
+| **60 min** | **4,586** | **2,503 / 660** | **1.15 (1.05 to 1.24)** | **0.19** | **0.96 (0.87 to 1.04)** |
+| 120 min | 1,433 | 632 / 248 | 0.27 (0.24 to 0.30) | 0.04 | 0.23 (0.20 to 0.26) |
+
+Checks: rescued/needless at 60 min match `0024`; flagged 19,577 matches the app's track record for the 60%+ band;
+the thumb rows equal `baselines.csv`. Read: Murphy still beats the rule of thumb at every deadline, with fewer
+changes and a lower net than the 50% rule (1.64), as Decision 4 expected.

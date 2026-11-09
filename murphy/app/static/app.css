@@ -253,3 +253,18 @@ table.days td.wrap { white-space: normal; min-width: 22em; }
 .feedback textarea { width: 100%; font: inherit; font-size: .88rem; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); }
 .feedback p { margin: 4px 0; width: 100%; }
 .feedback .refined { background: var(--accent-soft); padding: 6px 10px; border-radius: var(--radius); }
+
+/* About page: problem columns, data tiles, comparison table (8 Nov) */
+.about-grid.two { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 900px) { .about-grid.two { grid-template-columns: 1fr; } }
+.about-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.about-cols h3 { font-size: .98rem; margin-bottom: 4px; }
+.about-cols ul, .about-wide ul { padding-left: 18px; margin: 0; }
+.about-wide li + li { margin-top: 6px; }
+@media (max-width: 760px) { .about-cols { grid-template-columns: 1fr; } }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.stats div { background: var(--accent-soft); border-radius: var(--radius); padding: 10px; text-align: center; }
+.stats b { display: block; font: 600 1.4rem var(--mono); color: var(--accent); }
+.stats span { font-size: .8rem; color: var(--muted); }
+.about-table { margin-top: 16px; }
+.about-table td:nth-child(2) { font-family: var(--mono); font-weight: 600; color: var(--accent); white-space: nowrap; }
