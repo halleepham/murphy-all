@@ -78,7 +78,8 @@ def predict(name_or_path, split, rows, feats, keep=None) -> pd.DataFrame:
         model = saved["model"]
     X, r, _ = gbm.load_split(split, saved["groups"], rows=rows, features=feats, carriers=saved["carriers"])
     if keep is not None:
-        X, r = X[keep(r)].reset_index(drop=True), r[keep(r)].reset_index(drop=True)
+        k = keep(r).to_numpy()  # by position: X keeps the row numbers of the whole file
+        X, r = X[k].reset_index(drop=True), r[k].reset_index(drop=True)
     return pd.concat([r, pd.DataFrame(gbm.predict(model, X), columns=PCOLS).astype("float32")], axis=1)
 
 
