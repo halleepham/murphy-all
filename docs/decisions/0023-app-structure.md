@@ -123,3 +123,45 @@ From the owner's slide: Edward A. Murphy Jr. (aerospace engineer, Murphy's law) 
 (meteorologist and statistician, forecast quality vs value), connected to the app: forecast what
 goes wrong, show how reliable past forecasts were, turn each into a decision. AI added one fact not on
 the slide, to check: the 1949 rocket-sled tests at Edwards Air Force Base.
+
+## Change, 8 Nov 2026: the styling pass
+
+**Human design.** The owner disliked the dark mode (the app followed the Mac's dark setting) and
+wanted something lighter, blue accents, and a look like a real application.
+
+**AI recommendation.** Three light mockups, built as temporary style overrides and screenshotted:
+A, a clean travel app (navy bar, bright blue, system font, soft shadows), **recommended**; B, a flight
+board (IBM Plex Sans and Mono, sharp edges, a dark departure-board strip); C, calm editorial (cream,
+serif headlines, slate blue).
+
+**Owner's decision: modified.** B's fonts, sharp edges and logo on C's cream background, so the
+page is warmer than B's cool gray. The departure-board strip is kept. Fonts are stored in the repo
+(`static/fonts/`, IBM Plex 5.3.0 from `@fontsource`, latin subset, 160 KB, SIL OFL 1.1 in
+`OFL.txt`) so the demo works offline. AI then warmed the grays (borders, secondary text) to match.
+
+**Owner's further asks, all built:**
+- Light only. Dark mode removed.
+- The brand in the top bar lines up with the page content: one page width (`--page`) for the top
+  bar, the content and the footer.
+- About page at full width: sections as cards, with How it works, Data sources and Limitations side
+  by side. Text unchanged.
+- Results page sectioning: each tab is a stack of white cards with space between them, so the map,
+  the weather and the alternatives read as separate sections.
+- Tabs styled as folder tabs that sit on the panel below them.
+- Drop-down arrows drawn by the page and set 14 px in from the edge.
+- Owner asked whether "Your flight and the alternatives" belongs with the map. AI: no, it compares
+  the alternatives, so it moved to the Options tab under the table. Its time zone still comes from
+  the map's data, now fetched once and shared by both tabs.
+
+Also added: a "how it works" strip and a footer on the landing page, a footer on every page, and
+designed loading and error states. No numbers, wording rules or folds changed.
+
+**Evidence.** Before and after screenshots of every page (headless Chrome with the Mac in dark
+mode, 8 Nov). `pytest -q`: 222 passed.
+
+**Owner's review of the styling, 8 Nov.** (1) No course name in the footer or on the About page; "How it works" there as one bullet per sentence. (2) The tab strip had its
+own scroll bar: a bug. `overflow-x: auto` on the strip also clips vertically, and the active tab
+sat 1 px taller. Fixed: the strip wraps instead of scrolling. (3) The deadline chart was confusing:
+the deadline and the typical-flight curve were both dashed, and Chart.js drew the legend keys solid.
+Fixed: the deadline is a solid line with a round handle, and the page draws the key itself, so the
+dashes show and the deadline has its own entry ("Your deadline (drag to move)").

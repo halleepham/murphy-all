@@ -11,6 +11,14 @@ async function get(url) {
   return body;
 }
 
+// A white section card in a tab (styling pass, 0023): an optional heading, then the content.
+function card(title, ...kids) {
+  const s = el("section", null, "card sec");
+  if (title) s.append(typeof title === "string" ? el("h3", title) : title);
+  s.append(...kids.filter(x => x != null));
+  return s;
+}
+
 // A folded section: "How to read this" for plain explanations, "Technical details" for sources and
 // model detail (0023). Items are strings (one paragraph each) or elements.
 function fold(summary, ...items) {

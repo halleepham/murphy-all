@@ -1,5 +1,5 @@
 // The map tab (0025). Every number comes from /api/map and /api/trip; this file only draws.
-// Layers: route + alternatives timeline (always), regions, linked airports, weather; a slider over
+// Layers: route (always), regions, linked airports, weather; a slider over
 // the 24 hours up to the forecast hour. Forecasts only, never what happened.
 
 const US = fetch("https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json").then(r => r.json());
@@ -8,11 +8,11 @@ const mapView = { regions: true, links: true, weather: true, hour: null, playing
 const VERDICT_COLOR = { keep: "--good", too_uncertain: "--warn" };  // anything else is --bad
 
 async function map(box) {
-  box.replaceChildren(el("p", "Drawing the map...", "muted"));
+  box.replaceChildren(card(null, el("p", "Drawing the map...", "loading")));
   const lead = $("lead").value;
   let d, us;
   try { [d, us] = await Promise.all([mapCache[lead] ||= get("/api/map?" + new URLSearchParams({ flight_id: flightId, lead_h: lead })), US]); }
-  catch (e) { delete mapCache[lead]; box.replaceChildren(el("p", e.message || "The map could not load.", "error")); return; }
+  catch (e) { delete mapCache[lead]; box.replaceChildren(card(null, el("p", e.message || "The map could not load.", "error"))); return; }
   if (tab !== "map") return;
   const last = d.hours_utc.length - 1;
   if (mapView.hour == null || mapView.hour > last) mapView.hour = last;
@@ -40,8 +40,9 @@ async function map(box) {
 
   const svgBox = el("div", null, "map-box"), side = el("div", null, "map-side");
   const grid = el("div", null, "map-grid"); grid.append(svgBox, side);
-  const wxBox = el("div"), timeline = el("div"), notes = el("div");
-  box.replaceChildren(toggles, timeRow, grid, wxBox, timeline, notes);
+  // Two sections: the map with its controls and notes, then the weather at each end.
+  const wxBox = el("section", null, "card sec"), notes = el("div");
+  box.replaceChildren(card("Around your route", toggles, timeRow, grid, notes), wxBox);
 
   // --- base map --------------------------------------------------------------------------------
   const W = 900, H = 540, proj = d3.geoAlbersUsa().scale(1150).translate([W / 2, H / 2]), path = d3.geoPath(proj);
@@ -148,7 +149,8 @@ async function map(box) {
 
   // Weather in plain words (murphy/wxtext.py): one line per airport, the rest folded.
   function renderWeather() {
-    if (!mapView.weather) { wxBox.replaceChildren(); return; }
+    if (!mapView.weather) { wxBox.replaceChildren(); wxBox.hidden = true; return; }
+    wxBox.hidden = false;
     const cols = el("div", null, "wx-grid");
     [[d.weather.origin, "departure"], [d.weather.dest, "arrival"]].forEach(([w, role]) => {
       const c = el("div", null, "wx-card");
@@ -174,7 +176,6 @@ async function map(box) {
     wxBox.replaceChildren(el("h3", "Weather"), cols);
   }
 
-  renderTimeline(timeline, d.route.origin?.tz);
   renderWeather();
   const lim = [...d.uncertainty.limits]; if (offMap) lim.push(`Airports outside the map's projection, not drawn: ${offMap}.`);
   const p = d.provenance;
@@ -184,7 +185,7 @@ async function map(box) {
   if (mapView.zoom) svg.call(zoom.transform, mapView.zoom); else draw();
 }
 
-// --- Alternatives as a timeline beside the route (0025): same route, so a bar per flight in time.
+// --- Alternatives as a timeline (0025): same route, so a bar per flight in time. Shown in Options.
 function renderTimeline(box, tz) {
   const f = trip.flight, rows = [{ ...f, original: true }, ...trip.alternatives.filter(a => a.schedule_ok)];
   const bad = trip.alternatives.length - rows.length + 1;

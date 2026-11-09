@@ -15,7 +15,7 @@
 <main class="layout">
  <div class="main">
   <section class="card">
-    <div class="flight-head" id="head"><span class="muted">Loading your flight...</span></div>
+    <div class="flight-head" id="head"><span class="loading">Loading your flight...</span></div>
     <div class="summary" id="summary" hidden>
       <div><div class="chance" id="chance"></div><div class="muted small">chance of landing by your deadline</div></div>
       <div><span class="verdict" id="verdict"></span><p class="muted small" id="track" style="margin:8px 0 0"></p></div>
@@ -28,6 +28,7 @@
     </div>
     <div class="whatif" id="whatif" hidden>
       <div class="whatif-head"><h3>What if your deadline changes?</h3><span class="muted small">Click or drag on the chart to set your deadline.</span></div>
+      <div class="legend" id="legend"></div>
       <div class="chart-box"><canvas id="chart" aria-label="Chance of making it by deadline"></canvas></div>
       <p class="muted small" id="whatif-note"></p>
     </div>
@@ -48,6 +49,8 @@
 <button type="button" class="fab" id="ask-open" aria-label="Ask Murphy" aria-expanded="false" aria-controls="assistant">
   <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
 </button>
+
+<footer class="footer"><div class="inner"><span>Murphy · by Hallee Pham</span><span>A replay of 2025 US flights</span><a href="/about">About and limits</a></div></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -115,9 +118,10 @@ const marker = {  // the traveler's deadline, and the range past what was checke
   },
   afterDatasetsDraw(c) {
     const { ctx, chartArea: a, scales: { x } } = c, px = x.getPixelForValue(c.$deadline);
-    ctx.save(); ctx.strokeStyle = css("--text"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.save(); ctx.strokeStyle = css("--text"); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
-    ctx.setLineDash([]); ctx.fillStyle = css("--text"); ctx.font = "600 12px " + css("--font"); ctx.textAlign = px > a.right - 60 ? "right" : "left";
+    ctx.fillStyle = css("--surface"); ctx.beginPath(); ctx.arc(px, a.top, 6, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = css("--text"); ctx.font = "600 12px " + css("--font"); ctx.textAlign = px > a.right - 60 ? "right" : "left";
     ctx.fillText(`your deadline: ${c.$deadline} min`, px + (ctx.textAlign === "left" ? 6 : -6), a.bottom - 8); ctx.restore();
   },
 };
@@ -144,7 +148,7 @@ function renderChart() {
                title: { display: true, text: "Chance of making it" } },
         },
         plugins: {
-          legend: { position: "top", align: "start", labels: { boxWidth: 14, boxHeight: 2 } },
+          legend: { display: false },  // drawn by the page (renderLegend) so the dashes show
           tooltip: { callbacks: { title: i => `Deadline +${i[0].parsed.x} min` + (i[0].parsed.x > c.checked_to ? " (not tested)" : ""),
                                   label: i => `${i.dataset.label}: ${i.parsed.y.toFixed(0)}%` } },
         },
@@ -165,9 +169,26 @@ function renderChart() {
       if (String(chart.$deadline) !== $("deadline").value) { $("deadline").value = chart.$deadline; load(); }
     });
   }
+  renderLegend(sets);
   const i = c.deadline_min.indexOf(deadline), alt = c.best_alt ? `, the best alternative ${pct(c.best_alt.chance[i])}` : "";
   $("whatif-note").textContent = `At +${deadline} min: this flight ${pct(c.chance[i])}${alt}, a typical 2025 flight forecast at the same time before departure ${pct(c.typical[i])}. Murphy hasn't tested its advice for deadlines more than ${c.checked_to} minutes after arrival, so the deadline stops there.`;
   $("whatif").hidden = false;
+}
+
+// The key, one short line per series as drawn, plus the deadline you drag.
+function renderLegend(sets) {
+  const item = (label, color, width, dash, handle) => {
+    const s = el("span", null, "key"), ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("width", handle ? 14 : 30); svg.setAttribute("height", 14);
+    const l = document.createElementNS(ns, "line");
+    Object.entries(handle ? { x1: 7, x2: 7, y1: 4, y2: 14 } : { x1: 0, x2: 30, y1: 7, y2: 7 }).forEach(([k, v]) => l.setAttribute(k, v));
+    l.setAttribute("stroke", color); l.setAttribute("stroke-width", width); if (dash) l.setAttribute("stroke-dasharray", dash.join(" "));
+    svg.append(l);
+    if (handle) { const c = document.createElementNS(ns, "circle"); [["cx", 7], ["cy", 5], ["r", 4], ["fill", css("--surface")], ["stroke", color], ["stroke-width", 1.5]].forEach(([k, v]) => c.setAttribute(k, v)); svg.append(c); }
+    s.append(svg, label); return s;
+  };
+  $("legend").replaceChildren(...sets.map(s => item(s.label, s.borderColor, s.borderWidth, s.borderDash)),
+    item("Your deadline (drag to move)", css("--text"), 2, null, true));
 }
 
 function renderTabs() {
@@ -186,7 +207,7 @@ function openTab(key) {
 // --- Options: alternatives, with the traveler's limits ---------------------------------------
 function options(box) {
   const a = trip.answer, alts = trip.alternatives, out = [];
-  if (a.verdict === "keep") { box.replaceChildren(el("p", "Your flight looks likely to make it. No change suggested.")); return; }
+  if (a.verdict === "keep") { box.replaceChildren(card("Other flights", el("p", "Your flight looks likely to make it. No change suggested."))); return; }
   const earlier = el("input"); Object.assign(earlier, { type: "number", min: 0, max: 24, step: 1, value: settings.max_earlier_h });
   earlier.onchange = () => { settings.max_earlier_h = earlier.value; load(); };
   const sort = el("select"); [["chance", "Chance of making it"], ["price", "Estimated price"]].forEach(([v, t]) => { const o = el("option", t); o.value = v; sort.append(o); });
@@ -194,8 +215,8 @@ function options(box) {
   const l1 = el("label", "Could leave up to (h earlier)", "field"), l2 = el("label", "Sort by", "field");
   l1.append(earlier); l2.append(sort);
   const ctl = el("div", null, "controls"); ctl.append(l1, l2); out.push(ctl);
-  if (!alts.length) { out.push(el("p", "No flight leaves within your limits and arrives by the deadline.", "muted")); box.replaceChildren(...out); return; }
-  const wrap = el("div", null, "scroll"), t = el("table"), head = el("tr");
+  if (!alts.length) { out.push(el("p", "No flight leaves within your limits and arrives by the deadline.", "muted")); box.replaceChildren(card("Other flights", ...out)); return; }
+  const wrap = el("div", null, "scroll"), t = el("table", null, "opts"), head = el("tr");
   ["", "Flight", "Departs", "Arrives", "Chance", "Compared with yours", "New ticket (est.)"].forEach(h => head.append(el("th", h)));
   t.append(head);
   alts.forEach(x => {
@@ -209,16 +230,21 @@ function options(box) {
   const notes = ["Price: the median fare paid on this route and airline (or route, if the airline has too little data), from " + alts[0].cost.source + ". One airline shows one figure, so price sorting compares airlines, not times."];
   if (alts.some(x => x.same_airline)) notes.push("* Same airline: this may cost only a fare difference, which the data does not show.");
   out.push(fold("About the prices", ...notes));
-  box.replaceChildren(...out);
+  // The timeline (0025) sits under the table: the same flights, drawn by scheduled time. Times are local
+  // at the origin, whose time zone comes with the map's data (cached, so the Map tab opens at once).
+  const timeline = el("div"), lead = $("lead").value;
+  box.replaceChildren(card("Other flights", ...out), card(null, timeline));
+  (mapCache[lead] ||= get("/api/map?" + new URLSearchParams({ flight_id: flightId, lead_h: lead })))
+    .then(d => renderTimeline(timeline, d.route.origin?.tz), () => { delete mapCache[lead]; renderTimeline(timeline, null); });
 }
 
 // --- Similar past days (0020): all departures that day, not this flight -----------------------
 async function pastdays(box) {
   const origin = trip.flight.origin;
-  box.replaceChildren(el("p", "Looking for similar past days...", "muted"));
+  box.replaceChildren(card(null, el("p", "Looking for similar past days...", "loading")));
   let d;
   try { d = await get("/api/pastdays?" + new URLSearchParams({ flight_id: flightId, lead_h: $("lead").value })); }
-  catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
+  catch (e) { box.replaceChildren(card(null, el("p", e.message, "error"))); return; }
   const out = [], a = d.answer, u = d.uncertainty;
   if (d.status === "no_weather") out.push(el("p", `No weather data for ${origin}. Similar past days cover the 30 busiest airports.`, "muted"));
   else if (a) {
@@ -242,7 +268,7 @@ async function pastdays(box) {
     out.push(fold("Technical details", `${d.provenance.method}. ${d.provenance.corpus}. Outcome: ${d.provenance.outcome}. Weather: ${d.provenance.weather}, product ${d.query.taf_product_id}.`,
       `Distance of each day (smaller is closer): ${d.days.map(x => `${x.date} ${x.distance.toFixed(2)}`).join(", ")}. Mean ${u.mean_distance == null ? "none" : u.mean_distance.toFixed(2)}; above ${u.thin_above} counts as thin. Decision record ${d.provenance.decisions.join(", ")}.`));
   }
-  if (tab === "pastdays") box.replaceChildren(...out);
+  if (tab === "pastdays") box.replaceChildren(card(`Similar past days at ${origin}`, ...out));
 }
 
 // --- Rules (0021): quoted as written, no LLM -----------------------------------------------
@@ -252,12 +278,12 @@ function rules(box) {
   const label = el("label", "Situation", "field"); label.append(pick); label.style.maxWidth = "360px";
   const result = el("div");
   pick.onchange = () => quote(pick.value, result);
-  box.replaceChildren(label, result);
+  box.replaceChildren(card("What the rules say", label, result));
   quote(pick.value, result);
 }
 
 async function quote(key, box) {
-  box.replaceChildren(el("p", "Looking in the rules...", "muted"));
+  box.replaceChildren(el("p", "Looking in the rules...", "loading"));
   let d;
   try { d = await get("/api/policies?" + new URLSearchParams({ flight_id: flightId, situation: key })); }
   catch (e) { box.replaceChildren(el("p", e.message, "error")); return; }
