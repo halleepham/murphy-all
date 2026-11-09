@@ -143,7 +143,7 @@ Its criteria will be written here before it runs.
 | G3 | At least half of 2025's gap (−0.0212) | −0.0486 | | pass |
 | G4 | Minus schedule-only | −0.0366 (−0.0416 to −0.0326) | −0.0331 | pass |
 | G5 | Late calibration gap, against climatology | 0.0053 against 0.0126 | 0.0112 against 0.0157 | pass |
-| G6 | "60% and up" true miss, 60 min | 80.7% (predicted 74.8%) | 82.0% | pass |
+| G6 | "60% and up" true miss, 60 min | 81.8% (predicted 74.8%) | 82.0% | pass |
 | G7 | "40 to 60%" true miss, 60 min | 52.7% (predicted 48.4%) | 53.3% | pass |
 
 **Multiclass Brier, all forecasts.** Lower is better.
@@ -190,7 +190,7 @@ share 24.7% against 25.1% true.
 | 30 min | 60% and up | 80.6% (76.1%) | 81.4% (75.7%) | 80.4% (75.4%) |
 | 60 min | keep | 8.9% (8.7%) | 8.5% (7.8%) | 8.8% (8.6%) |
 | 60 min | too uncertain | 52.7% (48.4%) | 53.3% (48.0%) | 51.7% (47.9%) |
-| 60 min | 60% and up | 80.7% (74.8%) | 82.0% (74.5%) | 80.9% (74.3%) |
+| 60 min | 60% and up | 81.8% (74.8%) | 82.0% (74.5%) | 80.9% (74.3%) |
 | 120 min | keep | 5.1% (4.8%) | 4.6% (4.2%) | 4.9% (4.7%) |
 | 120 min | too uncertain | 55.9% (48.6%) | 54.1% (48.2%) | 52.5% (48.2%) |
 | 120 min | 60% and up | 81.3% (73.4%) | 79.8% (72.4%) | 78.7% (72.5%) |
@@ -213,3 +213,52 @@ share 24.7% against 25.1% true.
 
 **Limits:** one year of eight months, the same 9.4% sample rule. The GCN for 2026 is the same refit, checked against
 2025; a model on both years, not a cross-fit. Climatology's 2026 score was already known (above).
+
+## Decision 2 — The 2026 advice replay: criteria and plan
+
+**AI proposal; owner accepted with three changes, 9 Nov 2026, before any 2026 replay result.**
+
+**What is replayed.** The app's rule (`0014` Decision 4): `final_network`, firm "consider changing" from 60%, a
+15-point gain, leaving at most 2 h earlier. The same method as `0013` and `0014` Finding 4: a trip is a sampled
+2026 flight at 24, 6 or 2 h; its deadline is 30, 60 or 120 min after scheduled arrival; alternatives are on the
+same route, leave 1 to 24 h after the forecast, arrive by the deadline, and are not known to be cancelled.
+Alternatives are built for trips at risk under the model or climatology at the widest setting, as on 2025.
+
+**Baselines,** as on 2025: the traveler's rule of thumb, and the schedule-only model under Murphy's rule.
+
+**Pass or fail.** Net is per 1,000 trips, with a 95% interval resampling whole days.
+
+| # | Test | Pass if | 2025 value |
+|---|---|---|---|
+| R1 | Murphy's net, 60 min | interval entirely above 0 | 1.15 (1.05 to 1.24) |
+| R2 | Murphy minus rule of thumb, 60 min | interval entirely above 0 | 0.96 (0.87 to 1.04) |
+| R3 | Murphy minus rule of thumb, 30 and 120 min | both intervals above 0 | 2.45, 0.23 |
+| R4 | Murphy's net holds up, 60 min | at least half of 2025's (0.57 or more) | 1.15 |
+| R5 | Rescued against needless, 60 min | rescued at least twice needless | 2,503 against 660 |
+| R6 | Made worse, 60 min | at most 5% of changes | 125 of 4,586 (2.7%)† |
+
+†`worse` column of `replay_final_network/baselines_firm60.csv` (2025), not shown in `0014` Finding 4. The `check` step
+recomputes it before the 2026 run.
+
+**Owner's changes:** (1) every count is shown with net per 1,000 and the rescued : needless ratio, since 2026 has
+fewer trips than 2025 and raw counts do not compare; (2) R6's 2025 source is cited and recomputed; (3) Finding 1's
+60-minute "60% and up" value corrected from 80.7% to 81.8%, in G6 and the bands table. The AI had copied the wrong
+cell; `bands.csv` gives 0.8183. G6 still passes.
+
+**Reported, not pass or fail:** every deadline's counts, each with net per 1,000 and rescued : needless; the replay's own 50% rule; the schedule-only model (under the 50% rule on
+2025 it made no change at 60 or 120 min); thumb flags with no saved alternatives.
+
+**Plan.** New file `scripts/eval_2026_replay.py`. It reuses the year-free parts of `replay_baselines.py` (`chances`,
+`pick`, `tally`) and changes neither of the 2025 scripts, which hard-code 2025.
+
+1. `check`: tally the **saved** 2025 replay with the new code. It must reproduce `baselines_firm60.csv` exactly.
+2. `build tune 2025-01`: rebuild the alternatives for January 2025 trips only. Pairs and forecasts must equal the
+   saved ones for those trips. This checks the build without the full 2025 rebuild.
+3. `build test`: forecasts for the 2026 trips; the alternatives; their inputs (groups A to E, climatology, hidden
+   aircraft inputs, communities and the GCN from `inputs` above); their forecasts by `final_network` and schedule-only.
+4. `tally test`, once. Then the results go here, beside 2025.
+
+**Known limits, before the run:** trips on 31 Aug 2026 lose alternatives after midnight, since there is no September
+file (31 Dec 2025 had the same limit). Past schedules do not show seats. No real deadlines exist.
+
+**Time:** estimated, not measured, about 35 to 50 minutes. The 2025 alternative inputs took 675 to 953 s.
