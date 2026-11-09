@@ -116,3 +116,10 @@ a collapsible, across the whole app. **AI proposed** a rule for every section, w
   with yours: +52 points" instead of "Gain +52 pts"; similarity scores and passage hashes folded.
 - Not changed: the similar-days sentences from `0020` still say "kt"; they are the text the search
   embeds, so rewording them means rebuilding that index.
+
+## Change, 8 Nov 2026: "Why Murphy" written
+
+From the owner's slide: Edward A. Murphy Jr. (aerospace engineer, Murphy's law) and Allan H. Murphy
+(meteorologist and statistician, forecast quality vs value), connected to the app: forecast what
+goes wrong, show how reliable past forecasts were, turn each into a decision. AI added one fact not on
+the slide, to check: the 1949 rocket-sled tests at Edwards Air Force Base.

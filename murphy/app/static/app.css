@@ -176,3 +176,18 @@ details.fold { margin-top: 8px; }
 details.fold > summary { font-size: .82rem; }
 details.fold > p, details.fold > ul { margin: 6px 0 0 14px; }
 table.days td.wrap { white-space: normal; min-width: 22em; }
+
+/* About: the two Murphys */
+.story { border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; margin: 8px 0 12px; }
+.story p { margin: 8px 0; }
+.story-lead { font-size: 1.15rem; font-weight: 700; }
+.story-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+.story-pair section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.story-pair h3 { font-size: .98rem; margin-bottom: 4px; }
+@media (max-width: 760px) { .story-pair { grid-template-columns: 1fr; } }
+
+/* Feedback under an Ask answer (0026) */
+.feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.feedback textarea { width: 100%; font: inherit; font-size: .88rem; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
+.feedback p { margin: 4px 0; width: 100%; }
+.feedback .refined { background: var(--accent-soft); padding: 6px 10px; border-radius: 8px; }

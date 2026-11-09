@@ -10,6 +10,7 @@ import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from murphy.cost import estimated_fare
 from murphy import policies as pol
@@ -248,6 +249,39 @@ def create_app(db: Path = DB, graph_session=None, past_index=None, taf_as_of=Non
             raise HTTPException(503, "The map's data files are not built on this machine.")
         t = t.iloc[0]
         return mapdata.build(t.origin, t.dest, t.as_of_utc, **m, dep_utc=t.sched_dep_utc, arr_utc=t.sched_arr_utc)
+
+    class Feedback(BaseModel):
+        flight_id: str
+        question: str
+        verdict: str = Field(pattern="^(right|wrong)$")
+        note: str = Field("", max_length=300)
+        lead_h: int = 2
+        deadline_min: int = 60
+        max_earlier_h: float = Field(MAX_EARLIER_H, ge=0, le=24)
+
+    @app.post("/api/feedback")
+    def feedback(f: Feedback):
+        """Human validation (0026): "right" is saved; "wrong" with a note returns one refined answer."""
+        from murphy import graphrag as gr
+        if f.question not in gr.QUESTIONS or f.lead_h not in LEADS or f.deadline_min != GRAPH_DEADLINE_MIN:
+            raise HTTPException(422, "Unknown question or settings.")
+        base = {"flight_id": f.flight_id, "question": f.question, "lead_h": f.lead_h, "max_earlier_h": f.max_earlier_h,
+                "verdict": f.verdict, "note": f.note.strip()}
+        if f.verdict == "right":
+            gr.log_feedback(base)
+            return {"status": "saved"}
+        if not f.note.strip():
+            raise HTTPException(422, "Say what looks wrong, so Murphy can check it.")
+        try:
+            with graph_session() as s:
+                out = gr.refine(s, f.question, f.flight_id, f.lead_h, f.max_earlier_h, f.note.strip())
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(503, "The knowledge graph is not reachable right now.")
+        gr.log_feedback(base | {"refined": out["status"] == "refined", "status": out["status"],
+                                "first": out["first"], "answer": out["explanation"], "checks": out["checks"]})
+        return out
 
     @app.get("/api/ask")
     def ask(flight_id: str, question: str, lead_h: int = 2, deadline_min: int = 60,

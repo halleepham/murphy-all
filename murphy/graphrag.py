@@ -211,6 +211,50 @@ def answer(session, key: str, flight_id: str, lead_h: int, max_earlier_h: float)
     return out
 
 
+# --- Human feedback (0026): the traveler validates or corrects an answer --------------------------
+
+FEEDBACK = kg.ROOT / "data" / "graphrag" / "feedback.jsonl"
+MAX_REFINES_PER_DAY = 20  # Groq budget guard: demo answers are cached and never count against it
+REFINE = """The traveler says your answer may be wrong. Their note: "{note}"
+Check the note against the evidence above. If the evidence supports the traveler, correct the answer.
+If it does not, say so politely and keep only what the evidence supports. Follow the same rules."""
+
+
+def log_feedback(record: dict) -> None:
+    FEEDBACK.parent.mkdir(parents=True, exist_ok=True)
+    with FEEDBACK.open("a") as f:
+        f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S")} | record) + "\n")
+
+
+def refines_today() -> int:
+    if not FEEDBACK.exists():
+        return 0
+    today = time.strftime("%Y-%m-%d")
+    return sum(1 for line in FEEDBACK.open() if (r := json.loads(line))["at"].startswith(today) and r.get("refined"))
+
+
+def refine(session, key: str, flight_id: str, lead_h: int, max_earlier_h: float, note: str) -> dict:
+    """One corrected answer: the first answer (from the cache, so free when it was shown) and the
+    traveler's note go back to the LLM with the same evidence. The number check runs against the
+    evidence only, so a number that appears only in the note is still flagged."""
+    first = answer(session, key, flight_id, lead_h, max_earlier_h)
+    out = {"question": first["question"], "note": note, "first": first.get("explanation"), "evidence": first["evidence"],
+           "explanation": None, "checks": None,
+           "provenance": first["provenance"] | {"decisions": first["provenance"]["decisions"] + ["0026"]}}
+    if first.get("status") != "answered":
+        return out | {"status": "no_first_answer"}
+    if refines_today() >= MAX_REFINES_PER_DAY:
+        return out | {"status": "limit"}
+    msgs = messages(first["question"], flight_id, lead_h, first["evidence"])
+    msgs += [{"role": "assistant", "content": first["explanation"]}, {"role": "user", "content": REFINE.format(note=note)}]
+    try:
+        out["explanation"] = llm(msgs, wait=False)
+    except (Paused, httpx.HTTPError):
+        return out | {"status": "paused"}
+    out["checks"] = check(out["explanation"], msgs[1]["content"], first["evidence"])
+    return out | {"status": "refined"}
+
+
 NUM = re.compile(r"\d+(?:\.\d+)?")
 
 

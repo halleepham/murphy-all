@@ -315,3 +315,56 @@ def test_scheduled_utc_times_reach_the_timeline(client):
     d = get(client, "high").json()
     assert d["flight"]["arrives_utc"] == "2025-03-01 15:00:00"
     assert all(a["departs_utc"] == "2025-03-01 13:00:00" and a["schedule_ok"] for a in d["alternatives"])
+
+
+# --- Human feedback (0026): validate or correct an answer; no Groq call in tests ----------------
+
+def fb(c, verdict, note="", question="chance", **kw):
+    return c.post("/api/feedback", json={"flight_id": "F", "question": question, "verdict": verdict, "note": note, **kw})
+
+
+@pytest.fixture
+def feedback_log(tmp_path, monkeypatch):
+    path = tmp_path / "feedback.jsonl"
+    monkeypatch.setattr(gr, "FEEDBACK", path)
+    return path
+
+
+def test_looks_right_is_saved_without_an_llm_call(asker, feedback_log, monkeypatch):
+    c, _, _ = asker
+    monkeypatch.setattr(gr, "llm", lambda msgs, wait=True: pytest.fail("LLM called"))
+    assert fb(c, "right").json() == {"status": "saved"}
+    assert '"verdict": "right"' in feedback_log.read_text()
+
+
+def test_something_wrong_returns_one_checked_correction(asker, feedback_log, monkeypatch):
+    c, _, _ = asker
+    calls = []
+    def fake(msgs, wait=True):
+        calls.append(msgs)
+        return "A 42% chance [E1]." if len(msgs) == 2 else "The evidence says 42%, not 10% [E1]."
+    monkeypatch.setattr(gr, "llm", fake)
+    d = fb(c, "wrong", note="I think it is 10%").json()
+    assert d["status"] == "refined" and d["first"] == "A 42% chance [E1]."
+    assert calls[-1][-2] == {"role": "assistant", "content": "A 42% chance [E1]."} and "10%" in calls[-1][-1]["content"]
+    assert d["checks"]["invented"] == ["10"]       # a number from the note alone is not evidence
+    assert '"refined": true' in feedback_log.read_text()
+
+
+def test_wrong_needs_a_note_and_the_daily_cap_holds(asker, feedback_log, monkeypatch):
+    c, _, _ = asker
+    monkeypatch.setattr(gr, "llm", lambda msgs, wait=True: "ok [E1].")
+    assert fb(c, "wrong").status_code == 422
+    monkeypatch.setattr(gr, "MAX_REFINES_PER_DAY", 1)
+    assert fb(c, "wrong", note="no").json()["status"] == "refined"
+    assert fb(c, "wrong", note="still no").json()["status"] == "limit"
+
+
+def test_feedback_at_the_groq_limit_says_so(asker, feedback_log, monkeypatch):
+    c, _, _ = asker
+    def limited(msgs, wait=True):
+        if len(msgs) > 2:
+            raise gr.Paused("60")
+        return "A 42% chance [E1]."
+    monkeypatch.setattr(gr, "llm", limited)
+    assert fb(c, "wrong", note="no").json()["status"] == "paused"

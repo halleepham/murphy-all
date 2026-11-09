@@ -355,7 +355,53 @@ async function ask(key, text) {
     det.append(fold("Technical details", `From queries ${d.provenance.queries.join(", ")} on ${d.provenance.graph}. Explained by ${d.provenance.llm}, which computes no number.${d.provenance.neighbor_order ? " Neighbors ordered by " + d.provenance.neighbor_order + "." : ""} Decision records: ${d.provenance.decisions.join(", ")}.`));
     out.push(det);
   }
+  if (d.status === "answered") out.push(feedbackRow(key));
   box.replaceChildren(...out);
+}
+
+// --- Human feedback (0026): confirm an answer, or say what is wrong and get one checked correction.
+async function sendFeedback(body) {
+  const r = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ flight_id: flightId, lead_h: +$("lead").value, deadline_min: +$("deadline").value, max_earlier_h: +settings.max_earlier_h, ...body }) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Request failed");
+  return d;
+}
+
+function feedbackRow(key) {
+  const row = el("div", null, "feedback");
+  const yes = el("button", "Looks right", "chip"), no = el("button", "Something's wrong", "chip");
+  yes.type = no.type = "button";
+  yes.onclick = async () => {
+    try { await sendFeedback({ question: key, verdict: "right" }); row.replaceChildren(el("p", "Thanks. Saved as checked by you.", "muted small")); }
+    catch (e) { row.append(el("p", e.message, "error small")); }
+  };
+  no.onclick = () => {
+    const note = el("textarea"); Object.assign(note, { rows: 2, maxLength: 300, placeholder: "What looks wrong? For example: the wind is lower than that." });
+    const send = el("button", "Ask Murphy to check", "btn small"); send.type = "button";
+    send.onclick = async () => {
+      if (!note.value.trim()) { note.focus(); return; }
+      send.disabled = true; send.textContent = "Checking against the evidence...";
+      let d;
+      try { d = await sendFeedback({ question: key, verdict: "wrong", note: note.value }); }
+      catch (e) { send.disabled = false; send.textContent = "Ask Murphy to check"; row.append(el("p", e.message, "error small")); return; }
+      const msg = { refined: null, paused: STATUS.paused, limit: "Today's corrections are used up. Your note was saved.",
+                    no_first_answer: "There is no answer to correct yet." }[d.status];
+      const out = [el("p", `You said: "${d.note}"`, "muted small")];
+      if (d.explanation) {
+        out.push(el("p", null, "refined"));
+        out.at(-1).append(el("strong", "Checked again: "), d.explanation);
+        if (d.checks.invented.length) out.push(el("p", "Check: these numbers are not in the evidence: " + d.checks.invented.join(", "), "error small"));
+        if (d.checks.bad_tags.length) out.push(el("p", "Check: it cites evidence that does not exist: " + d.checks.bad_tags.join(", "), "error small"));
+        out.push(el("p", "Same evidence as above. Murphy corrects only what the evidence supports.", "muted small"));
+      } else out.push(el("p", msg, "muted small"));
+      row.replaceChildren(...out);
+    };
+    row.replaceChildren(note, send);
+    note.focus();
+  };
+  row.append(el("span", "Is this answer right?", "muted small"), yes, no);
+  return row;
 }
 
 for (let d = 0; d <= 120; d += 15) { const o = el("option", `${d} min`); o.value = d; if (d === 60) o.selected = true; $("deadline").append(o); }
