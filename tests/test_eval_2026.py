@@ -74,3 +74,36 @@ def test_informed_forecast_beats_climatology_and_a_copy_does_not():
     base = ev.brier_rows(clim, outcome).mean()
     assert ev.brier_rows(told, outcome).mean() < base
     assert ev.brier_rows(clim.copy(), outcome).mean() == base
+
+
+# ---- the advice replay (0027 Decision 2) ----
+
+from scripts import eval_2026_replay as rp
+
+
+def test_ratio_is_blank_without_needless_changes():
+    assert rp.ratio(10, 4) == 2.5 and np.isnan(rp.ratio(3, 0))
+
+
+def test_rates_sit_beside_counts():
+    r = rp.add_rates({"trips": 2000, "changes": 10, "rescued": 6, "needless": 2, "worse": 1})
+    assert r["changes_per_1000"] == 5 and r["rescued_per_needless"] == 3 and r["worse_share"] == 0.1 and r["changes"] == 10
+
+
+def _table(lo60=0.5, mm_lo=(0.1, 0.1, 0.1), net60=1.0, rescued=30, needless=10, worse=1, changes=50):
+    rows = []
+    for buf, mlo in zip((30, 60, 120), mm_lo):
+        rows.append({"rule": "murphy_firm60", "buffer": buf, "lo": lo60, "net": net60, "rescued": rescued, "needless": needless,
+                     "worse": worse, "changes": changes})
+        rows.append({"rule": "thumb", "buffer": buf, "mm_lo": mlo})
+    return pd.DataFrame(rows)
+
+
+def test_r_tests_pass_on_a_clear_win():
+    assert all(rp.r_tests(_table(), net_2025_60=1.15).values())
+
+
+def test_r_tests_fail_when_an_interval_reaches_zero():
+    """The deliberate failure: a gain whose interval touches 0, no lead over the thumb at 60 or 120 min, too few rescues."""
+    t = rp.r_tests(_table(lo60=0.0, mm_lo=(0.1, 0.0, -0.01), net60=0.5, rescued=15, worse=3), net_2025_60=1.15)
+    assert not any(t.values())
