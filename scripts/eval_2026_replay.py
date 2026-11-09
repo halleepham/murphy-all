@@ -176,17 +176,23 @@ def same_as_saved(R) -> None:
     # Hidden alternatives borrow aircraft inputs at random from the pool of alternatives (0014), and one month's
     # pool is smaller than the year's, so only those not hidden must match exactly.
     raw = pd.read_parquet(R / "alt_features" / "d_raw.parquet", columns=["prior_turn_min"]).prior_turn_min
-    ar = pd.read_parquet(R / "alt_rows.parquet", columns=["flight_id", "lead_h"]).rename(columns={"flight_id": "alt", "lead_h": "alt_lead"})
+    ar = pd.read_parquet(R / "alt_rows.parquet", columns=["flight_id", "lead_h", "as_of_utc"]).rename(columns={"flight_id": "alt", "lead_h": "alt_lead"})
     ar["hidden"] = ((ar.alt_lead < 24) & (raw.isna() | (raw < 0))).to_numpy()
     m = m.merge(ar, on=["alt", "alt_lead"])
     d = np.abs(m[PCOLS].to_numpy() - m[[f"{c}_old" for c in PCOLS]].to_numpy()).max(axis=1)
-    gap, hidden_gap = float(d[~m.hidden].max()), float(d[m.hidden].max()) if m.hidden.any() else 0.0
+    # The saved 2025 replay looked up 2024 hours in a cross-fit GCN array (a model on 2023 alone); this build uses the
+    # 2023-24 model at every hour, which is the one for 2025 and 2026. So only forecast times in 2025 must match (0027).
+    same_year = (m.as_of_utc.dt.year == 2025).to_numpy()
+    exact = ~m.hidden.to_numpy() & same_year
+    gap, hidden_gap = float(d[exact].max()), float(d[m.hidden.to_numpy()].max()) if m.hidden.any() else 0.0
+    prior_gap = float(d[~m.hidden.to_numpy() & ~same_year].max()) if (~same_year).any() else 0.0
     c_new = pd.read_parquet(R / "current.parquet")
     c_old = pd.read_parquet(SAVED_2025 / "current.parquet").merge(c_new[KEYS], on=KEYS)
     mc = c_new.merge(c_old, on=KEYS, suffixes=("", "_old"))
     cgap = float(np.abs(mc[PCOLS].to_numpy() - mc[[f"{c}_old" for c in PCOLS]].to_numpy()).max())
     res = {"pairs_new": len(new_p), "pairs_saved": len(old_p), "pairs_equal": bool(same_pairs),
-           "alt_forecasts": len(a_new), "matched": len(m), "hidden": int(m.hidden.sum()), "alt_max_diff": gap,
+           "alt_forecasts": len(a_new), "matched": len(m), "hidden": int(m.hidden.sum()), "compared_exactly": int(exact.sum()),
+           "alt_max_diff": gap, "prior_year_not_hidden": int((~m.hidden.to_numpy() & ~same_year).sum()), "prior_year_max_diff": prior_gap,
            "hidden_max_diff": hidden_gap, "trips": len(c_new), "trip_max_diff": cgap}
     log("gate 2:", res)
     (R / "gate.json").write_text(json.dumps(res))

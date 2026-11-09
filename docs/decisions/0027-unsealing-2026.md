@@ -262,3 +262,20 @@ cell; `bands.csv` gives 0.8183. G6 still passes.
 file (31 Dec 2025 had the same limit). Past schedules do not show seats. No real deadlines exist.
 
 **Time:** estimated, not measured, about 35 to 50 minutes. The 2025 alternative inputs took 675 to 953 s.
+
+### Gates before the 2026 replay, 9 Nov 2026
+
+- **Gate 1 passed.** `eval_2026_replay.py check` tallies the saved 2025 replay with the new loader and reproduces
+  `baselines_firm60.csv` exactly. R6's 2025 value recomputes to 125 of 4,586 changes (2.73%).
+- **Gate 2 failed, then passed with a narrower scope, owner's decision.** `build tune 2025-01` rebuilt January 2025:
+  pairs identical (47,358), trip forecasts identical (159,951, difference 0.0), and 42,762 alternatives not hidden
+  with a 2025 forecast time identical (0.0). 37 alternatives with a 2024 forecast time differ by up to 0.023: the saved
+  2025 replay looked up 2024 hours in a cross-fit GCN array (a model on 2023 alone), and this build uses the 2023–24
+  model at every hour, the one meant for 2025 and 2026. All 39 rows with a different GCN input have 2024 forecast
+  times; none in 2025 do. 4,484 hidden alternatives differ, as expected: their aircraft inputs are borrowed from a
+  smaller pool. **Owner chose:** compare exactly only alternatives not hidden with a forecast time in 2025.
+- **31 Dec 2025 inputs.** 1,374 of the 1,439,445 2026 trip forecasts have a forecast time in 2025 (1,373 at 24 h,
+  1 at 6 h). They have full inputs: the input build reads every flight and weather file, the community windows read
+  2024–26, and the GCN array covers every hour from 2023 to August 2026. Blank shares, these trips against other 2026
+  trips: GCN 9.6% against 9.8%, communities 0.1% against 2.2%, current state 2.3% against 6.1%, weather 40.6% against
+  38.9%, history 0% for both.
