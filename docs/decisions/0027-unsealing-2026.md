@@ -279,3 +279,63 @@ file (31 Dec 2025 had the same limit). Past schedules do not show seats. No real
   2024–26, and the GCN array covers every hour from 2023 to August 2026. Blank shares, these trips against other 2026
   trips: GCN 9.6% against 9.8%, communities 0.1% against 2.2%, current state 2.3% against 6.1%, weather 40.6% against
   38.9%, history 0% for both.
+
+## Finding 2 — The 2026 advice replay, 9 Nov 2026
+
+**Run once.** `PYTHONPATH=. python scripts/eval_2026_replay.py build test` (current forecasts 234 s, alternative inputs
+619 s, alternative forecasts 1,030 s), then `tally test`. Logs: `data/forecast/logs/eval_2026_replay_{build,tally}.log`;
+results: `data/forecast/eval_2026/replay_test/rules.csv` and `replay_2025/rules.csv`. 217,703 of 1,439,445 trips at risk at
+the widest setting; 710,844 pairs; 710,140 alternatives. 137 alternatives have a forecast time on 31 Dec 2025; their inputs
+are as complete as the rest except the GCN (blank 5.8% against 2.8%, about 8 rows against 4 expected).
+The 2025 column also reproduces `0017`'s 50% rule (changes 21,897, 7,600, 2,443; net 4.74, 1.64, 0.44).
+
+**All six tests pass.**
+
+| # | Test | 2026 | 2025 | Result |
+|---|---|---|---|---|
+| R1 | Murphy's net, 60 min | 1.44 (1.28 to 1.62) | 1.15 (1.05 to 1.24) | pass |
+| R2 | Murphy minus rule of thumb, 60 min | 1.25 (1.11 to 1.44) | 0.96 (0.87 to 1.04) | pass |
+| R3 | Murphy minus rule of thumb, 30 / 120 min | 3.09 (2.79 to 3.45) / 0.34 (0.28 to 0.41) | 2.45 / 0.23 | pass |
+| R4 | Net at 60 min at least 0.57 | 1.44 | 1.15 | pass |
+| R5 | Rescued : needless, 60 min, at least 2 | 3.14 (2,235 : 712) | 3.79 (2,503 : 660) | pass |
+| R6 | Made worse, 60 min, at most 5% | 3.4% (165 of 4,896) | 2.7% (125 of 4,586) | pass |
+
+**The app's rule (firm from 60%) against the baselines.** Rates first, counts after; 2026 has 1,439,445 trips, 2025 has
+2,070,453, so counts do not compare. Net and changes are per 1,000 trips.
+
+| Deadline | Rule | Year | Net (95% interval) | Changes per 1,000 | Rescued : needless | Made worse | Murphy minus this rule | Changes / rescued / needless / worse / both missed |
+|---|---|---|---|---|---|---|---|---|
+| 30 min | Murphy | 2026 | 3.58 (3.26 to 3.97) | 8.01 | 2.78 | 2.8% | | 11,531 / 5,480 / 1,975 / 323 / 3,753 |
+| | | 2025 | 2.91 (2.67 to 3.10) | 5.72 | 3.26 | 2.6% | | 11,832 / 6,319 / 1,940 / 305 / 3,268 |
+| | Thumb | 2026 | 0.50 (0.45 to 0.54) | 0.77 | 42.2 | 0.2% | 3.09 (2.79 to 3.45) | 1,111 / 717 / 17 / 2 / 375 |
+| | | 2025 | 0.45 (0.42 to 0.49) | 0.70 | 39.2 | 0.3% | 2.45 (2.23 to 2.63) | 1,442 / 941 / 24 / 4 / 473 |
+| 60 min | Murphy | 2026 | 1.44 (1.28 to 1.62) | 3.40 | 3.14 | 3.4% | | 4,896 / 2,235 / 712 / 165 / 1,784 |
+| | | 2025 | 1.15 (1.05 to 1.24) | 2.22 | 3.79 | 2.7% | | 4,586 / 2,503 / 660 / 125 / 1,298 |
+| | Thumb | 2026 | 0.19 (0.16 to 0.21) | 0.28 | 38.7 | 0.7% | 1.25 (1.11 to 1.44) | 408 / 271 / 7 / 3 / 127 |
+| | | 2025 | 0.19 (0.17 to 0.21) | 0.27 | 25.7 | 0.2% | 0.96 (0.87 to 1.04) | 564 / 386 / 15 / 1 / 162 |
+| 120 min | Murphy | 2026 | 0.39 (0.32 to 0.47) | 1.25 | 2.34 | 5.7% | | 1,795 / 661 / 283 / 102 / 749 |
+| | | 2025 | 0.27 (0.24 to 0.30) | 0.69 | 2.55 | 5.0% | | 1,433 / 632 / 248 / 72 / 481 |
+| | Thumb | 2026 | 0.05 (0.04 to 0.06) | 0.06 | 71.0 | 0.0% | 0.34 (0.28 to 0.41) | 92 / 71 / 1 / 0 / 20 |
+| | | 2025 | 0.04 (0.03 to 0.05) | 0.05 | 13.2 | 0.9% | 0.23 (0.20 to 0.26) | 108 / 79 / 6 / 1 / 22 |
+
+**Schedule-only model under the same rule:** no forecast reaches 60%, so it changes nothing at any deadline, in either
+year (net 0.00).
+
+**The replay's own 50% rule, for reference** (net per 1,000; rescued : needless): 2026 5.63, 2.13, 0.63 at 30, 60, 120 min
+(1.65, 1.96, 1.59); 2025 4.74, 1.64, 0.44 (1.88, 2.11, 1.79). Firm-from-60% keeps a better rescued : needless ratio at every
+deadline in both years, at a lower net, as `0014` Decision 4 chose.
+
+**Read:**
+- The advice holds up on 2026. Murphy's net is higher than in 2025 at every deadline and beats the rule of thumb at
+  every deadline, with intervals well above 0.
+- **Higher net is not better advice.** 2026 has more trips at risk: Murphy flags 15.4 per 1,000 at 60 min against 9.5 in
+  2025, and makes 3.40 changes per 1,000 against 2.22. Per change, 2026 is slightly worse: rescued : needless falls from
+  3.79 to 3.14, and made worse rises from 2.7% to 3.4%. A harder year gives more trips worth rescuing.
+- At 120 min, made worse is 5.7% of changes in 2026 (5.0% in 2025). Not a test, but over R6's 5% line for the 60-minute case.
+- The rule of thumb is precise and rare in both years: 38.7 rescues per needless change at 60 min, but 0.28 changes per
+  1,000. No 2025 Jan–Aug column was computed for the replay; full 2025 includes fall and holidays.
+
+**Limits:** as in `0013`: past schedules do not show seats; the deadlines are simulated; the traveler is assumed to take
+the advice. Trips on 31 Aug 2026 lose alternatives after midnight. Rule-of-thumb flags with no allowed alternative (none
+that arrives by the deadline and leaves at most 2 h earlier) count as no change: at 30, 60, 120 min, 2,526, 627, 70 of 3,637,
+1,035, 162 flags in 2026, and 3,108, 816, 68 of 4,550, 1,380, 176 in 2025. This is not `0014`'s "no saved alternatives" count.
